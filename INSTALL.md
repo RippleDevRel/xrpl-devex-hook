@@ -122,6 +122,7 @@ Links (or copies on Windows) `xrpl-setup`, `xrpl-status`, `xrpl-feedback`, `xrpl
 ## Step 4: test
 
 ```bash
+npm test
 node REPO/hook/status.mjs
 ```
 
