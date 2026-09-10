@@ -36,6 +36,7 @@ function hooksRegistered() {
     path.join(project, ".grok", "hooks", "xrpl-devex.json"),
     path.join(project, ".codex", "hooks.json"),
     path.join(project, ".cursor", "hooks.json"),
+    path.join(project, ".github", "hooks", "xrpl-devex.json"),
   ];
   const found = [];
   let reflection = false;
@@ -96,7 +97,7 @@ const status = {
   pending_analyses: pending,
   last_flush_at: state.last_flush_at,
   last_flush_result: state.last_flush_result,
-  passive_capture_note: "Passive hooks (prompts, tool results) run in Claude Code, Grok, Codex and Cursor.",
+  passive_capture_note: "Passive hooks (prompts, tool results) run in Claude Code, Grok, Codex, Cursor and GitHub Copilot.",
 };
 
 if (argv.includes("--json")) {

@@ -200,13 +200,38 @@ export function codexToml() {
   ].join("\n");
 }
 
+function copilotCmd(rel, extra = [], timeout = 10) {
+  const command = `node ${[abs(rel), ...extra].map(shellArg).join(" ")}`;
+  return { type: "command", command, bash: command, powershell: command, timeout, timeoutSec: timeout };
+}
+
 export function vscodeHooks() {
-  return { hooks: { Stop: [{ type: "command", command: `node "${abs("agents/vscode-copilot/stop-hook.mjs")}"`, timeout: 60 }] } };
+  const captureEvent = (event, extra = [], timeout = 10) => copilotCmd("capture.mjs", ["--event", event, ...extra], timeout);
+  const stop = copilotCmd("agents/vscode-copilot/stop-hook.mjs", [], 15);
+  const events = {
+    SessionStart: [captureEvent("SessionStart")],
+    UserPromptSubmit: [captureEvent("UserPromptSubmit")],
+    PostToolUse: [captureEvent("PostToolUse"), captureEvent("PostToolUse", ["--package-install"])],
+    PreCompact: [captureEvent("PreCompact")],
+    Stop: [captureEvent("Stop", [], 20), stop],
+    sessionEnd: [captureEvent("SessionEnd", [], 10)],
+  };
+  return {
+    version: 1,
+    hooks: {
+      ...events,
+      sessionStart: events.SessionStart,
+      userPromptSubmitted: events.UserPromptSubmit,
+      postToolUse: events.PostToolUse,
+      preCompact: events.PreCompact,
+      agentStop: events.Stop,
+    },
+  };
 }
 
 // True when a hook handler object was emitted by us.
 export function isOurs(handler) {
-  const parts = [handler && handler.command, ...((handler && handler.args) || [])].filter((x) => typeof x === "string");
+  const parts = [handler && handler.command, handler && handler.bash, handler && handler.powershell, ...((handler && handler.args) || [])].filter((x) => typeof x === "string");
   return parts.some((s) => s.includes(fwd(HOOK_DIR)) || /capture\.mjs|stop-hook\.mjs/.test(s));
 }
 

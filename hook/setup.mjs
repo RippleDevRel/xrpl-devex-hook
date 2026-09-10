@@ -6,7 +6,7 @@
 //   CONSENT=no node hook/setup.mjs --non-interactive        records the refusal
 //   node hook/setup.mjs --emit-hooks         print registrations, absolute paths
 //   node hook/setup.mjs --emit-hooks --agent claude-code --json
-//   node hook/setup.mjs --register               project hooks for Claude Code, Grok, Codex and Cursor
+//   node hook/setup.mjs --register               project hooks for Claude Code, Grok, Codex, Cursor and Copilot
 //   node hook/setup.mjs --register grok          one agent only
 //   node hook/setup.mjs --unregister             remove the project hooks this setup wrote
 //   node hook/setup.mjs --show-consent
@@ -91,7 +91,7 @@ function emitHooks({ agent, asJson }) {
   out("");
   out("Codex alternative  ->  .codex/config.toml");
   out(codexToml());
-  out("Register shortcut: node hook/setup.mjs --register writes Claude Code, Grok, Codex and Cursor project files.");
+  out("Register shortcut: node hook/setup.mjs --register writes Claude Code, Grok, Codex, Cursor and Copilot project files.");
 }
 
 function readJsonFile(file) {
@@ -134,15 +134,18 @@ const REGISTERED_AGENTS = {
     registerMerged(path.join(project, ".codex", "hooks.json"), mergeCodexSettings, remove),
   cursor: (remove) =>
     registerMerged(path.join(project, ".cursor", "hooks.json"), mergeCursorSettings, remove, removeCursorSettings),
+  "vscode-copilot": (remove) =>
+    registerDedicated(path.join(project, ".github", "hooks", "xrpl-devex.json"), vscodeHooks(), remove),
 };
 
 const PROJECT_AGENTS = Object.keys(REGISTERED_AGENTS);
 
 function registerAgent(agent, remove) {
+  if (agent === "copilot") agent = "vscode-copilot";
   const names = !agent || agent === "all" ? PROJECT_AGENTS : [agent];
   for (const name of names) {
     if (!REGISTERED_AGENTS[name]) {
-      process.stderr.write(`unknown agent ${name}. Use one of: all, ${PROJECT_AGENTS.join(", ")}. For vscode-copilot use --emit-hooks and paste the block.\n`);
+      process.stderr.write(`unknown agent ${name}. Use one of: all, ${PROJECT_AGENTS.join(", ")}.\n`);
       process.exit(1);
     }
   }

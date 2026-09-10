@@ -18,7 +18,7 @@ Do this first, in order. Every step is project scoped: write only inside the pro
    ```
    Do not continue until they answer. Do not guess the team name. Never ask for a real name or an email: none is collected, the developer gets a random pseudonym.
 
-4. Record the answer. This also writes project-local hooks for Claude Code, Grok, Codex and Cursor (same `capture.mjs`; Cursor stop uses `followup_message`) and installs the skills. Never write into a home directory config.
+4. Record the answer. This also writes project-local hooks for Claude Code, Grok, Codex, Cursor and GitHub Copilot (same `capture.mjs`) and installs the skills. Never write into a home directory config.
    ```bash
    TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive
    ```
@@ -30,6 +30,6 @@ Do this first, in order. Every step is project scoped: write only inside the pro
    ```
    Mention that they should trust the project (`/hooks-trust` in Grok, `/hooks` in Claude Code, Codex or Cursor) so the hooks load, and that `/xrpl-feedback <text>` and `/xrpl-session-analysis` are available. Then go build.
 
-   VS Code Copilot still needs a paste: `node REPO/hook/setup.mjs --emit-hooks`. Any other agent: `REPO/INSTALL.md`.
+   Any other agent: `REPO/INSTALL.md`.
 
 Full details, per-agent templates and the fallback path are in `REPO/INSTALL.md`. What is captured and what is not is in `REPO/docs/PRIVACY.md`.

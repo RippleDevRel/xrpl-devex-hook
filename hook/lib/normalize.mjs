@@ -12,6 +12,12 @@ const TOOL_NAME_ALIASES = {
   search_replace: "Edit",
   multiedit: "Edit",
   apply_patch: "Edit",
+  run_in_terminal: "Bash",
+  runTerminalCommand: "Bash",
+  editFiles: "Edit",
+  createFile: "Write",
+  create_file: "Write",
+  replace_string_in_file: "Edit",
   read_file: "Read",
   web_search: "WebSearch",
   web_fetch: "WebFetch",
@@ -44,6 +50,9 @@ const EVENT_ALIASES = {
   postToolUseFailure: "PostToolUseFailure",
   preCompact: "PreCompact",
   stop: "Stop",
+  userPromptSubmitted: "UserPromptSubmit",
+  agentStop: "Stop",
+  errorOccurred: "PostToolUseFailure",
 };
 
 export function toPascalEventName(name) {
@@ -70,6 +79,9 @@ export function normalizeToolInput(input, rawName) {
   const src = input && typeof input === "object" && !Array.isArray(input) ? { ...input } : {};
   const filePath = firstDefined(src, ["file_path", "target_file", "filePath", "path"]);
   if (typeof filePath === "string" && !src.file_path) src.file_path = filePath;
+  if (!src.file_path && Array.isArray(src.files) && src.files[0]) {
+    src.file_path = typeof src.files[0] === "string" ? src.files[0] : src.files[0].path || src.files[0].filePath;
+  }
   if (rawName === "apply_patch") {
     const patchText = typeof src.command === "string" ? src.command : typeof src.patch === "string" ? src.patch : "";
     if (patchText) {

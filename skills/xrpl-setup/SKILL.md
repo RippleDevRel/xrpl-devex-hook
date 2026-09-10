@@ -35,9 +35,7 @@ The script prints the pseudonym, adds `.xrpl-devex/` to the project `.gitignore`
 
 ## 4. Project hooks
 
-`CONSENT=yes` already registered Claude Code, Grok, Codex and Cursor hooks in this project and installed the skills. If they are missing, run `node REPO/hook/setup.mjs --register`. Never write into a home directory config.
-
-VS Code Copilot: `node REPO/hook/setup.mjs --emit-hooks` and paste. Tell the developer to trust the folder (`/hooks-trust` or `/hooks`).
+`CONSENT=yes` already registered Claude Code, Grok, Codex, Cursor and GitHub Copilot hooks in this project and installed the skills. If they are missing, run `node REPO/hook/setup.mjs --register`. Never write into a home directory config. Tell the developer to trust the folder (`/hooks-trust` or `/hooks`).
 
 ## 5. Verify and report
 

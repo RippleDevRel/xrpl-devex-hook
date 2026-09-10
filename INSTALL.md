@@ -10,8 +10,8 @@ Four channels, one taxonomy (`docs/TAXONOMY.md`):
 
 | channel | mechanism | agents |
 |---|---|---|
-| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code, Grok, Codex, Cursor |
-| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code, Grok, Codex and Cursor (signal), VS Code Copilot (sampled) |
+| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code, Grok, Codex, Cursor, GitHub Copilot |
+| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code, Grok, Codex, Cursor and GitHub Copilot (signal) |
 | `/xrpl-feedback` | you type what happened, the model classifies it, one-line ack | Claude Code, Grok, Cursor, Codex |
 | `/xrpl-session-analysis` | the model writes a report plus JSON from the transcript and hook evidence, asks before submitting | Claude Code, Grok, Cursor, Codex |
 
@@ -60,7 +60,7 @@ Consent (`--non-interactive` or the interactive prompt) already does this. To do
 node REPO/hook/setup.mjs --register
 ```
 
-Writes Claude Code, Grok, Codex and Cursor hook files inside the project (never `~/.claude` or `~/.grok`) and installs the skills. They call the same `hook/capture.mjs` (Cursor stop uses `agents/cursor/stop-hook.mjs` because it injects via `followup_message`). `--unregister` removes them. `--register grok` (or `claude-code`, `codex`, `cursor`) limits it to one agent.
+Writes Claude Code, Grok, Codex, Cursor and GitHub Copilot hook files inside the project (never `~/.claude` or `~/.grok`) and installs the skills. They call the same `hook/capture.mjs`. Cursor stop uses `followup_message`; Copilot Stop uses exit 2. `--unregister` removes them. `--register grok` (or `claude-code`, `codex`, `cursor`, `vscode-copilot`) limits it to one agent.
 
 Trust the project before hooks run: `/hooks-trust` in Grok, `/hooks` in Claude Code, Codex and Cursor.
 
@@ -102,9 +102,15 @@ node REPO/hook/setup.mjs --register codex
 
 Merges into `<project>/.codex/hooks.json` (SessionStart, UserPromptSubmit, PostToolUse for Bash and apply_patch, Stop, PreCompact, SessionEnd). Codex requires you to trust project hooks in `/hooks` before they run. SessionEnd timeout is 3 seconds (Codex's cap). Alternative: `--emit-hooks --agent codex`, or the TOML form in `hook/agents/codex/config.toml.snippet`. `--unregister codex` removes only ours.
 
-### VS Code Copilot
+### GitHub Copilot (VS Code and CLI)
 
-VS Code exposes a `Stop` hook, but it is not confirmed that it re-invokes the model to run a command. Primary, reliable path: paste the output of `node REPO/hook/print-instruction.mjs` under the heading in `hook/agents/vscode-copilot/copilot-instructions.snippet.md` into `<project>/.github/copilot-instructions.md`. Optional backup: `node REPO/hook/setup.mjs --emit-hooks --agent vscode-copilot` into `<project>/.github/hooks/xrpl-devex.json`. Make sure Copilot can run terminal commands.
+```bash
+node REPO/hook/setup.mjs --register vscode-copilot
+```
+
+Writes `<project>/.github/hooks/xrpl-devex.json` (version 1). VS Code loads PascalCase events (`SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`) with a `command` string. Copilot CLI reads the same file's camelCase aliases (`sessionStart`, `userPromptSubmitted`, `postToolUse`, `agentStop`) plus `bash`/`powershell`. Tool names like `run_in_terminal` and `editFiles` are normalized. `--unregister vscode-copilot` deletes that file.
+
+Optional extra: paste `node REPO/hook/print-instruction.mjs` into `.github/copilot-instructions.md` if hooks are disabled by org policy.
 
 ### Any other agent (fallback, for an AI installer)
 

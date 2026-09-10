@@ -84,6 +84,7 @@ test("hackathon e2e: consent, Grok/Claude/Codex commands, local buffer, no inges
     assert.equal(fs.existsSync(path.join(dir, ".codex", "hooks.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".claude", "settings.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".cursor", "hooks.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".github", "hooks", "xrpl-devex.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".grok", "skills", "xrpl-status", "SKILL.md")), true);
     assert.match(fs.readFileSync(path.join(dir, ".gitignore"), "utf8"), /\.xrpl-devex\//);
 
@@ -164,6 +165,17 @@ test("hackathon e2e: consent, Grok/Claude/Codex commands, local buffer, no inges
       prompt: "how do I call VaultWithdraw on xls-65",
     });
     assert.equal(cursorPrompt.status, 0, cursorPrompt.stderr);
+
+    const copilotHooks = readJson(path.join(dir, ".github", "hooks", "xrpl-devex.json"));
+    const copilot = runShellHook(copilotHooks.hooks.PostToolUse[0].command, dir, {
+      hook_event_name: "PostToolUse",
+      session_id: "hack-1",
+      cwd: dir,
+      tool_name: "run_in_terminal",
+      tool_input: { command: "node vault.js" },
+      tool_response: "VaultDeposit tecNO_PERMISSION",
+    });
+    assert.equal(copilot.status, 0, copilot.stderr);
 
     const claudeSettings = readJson(path.join(dir, ".claude", "settings.json"));
     const claudePost = claudeSettings.hooks.PostToolUse[0].hooks[0];

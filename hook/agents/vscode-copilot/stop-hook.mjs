@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// VS Code (Copilot) Stop hook, reflection channel. Mirrors Claude Code's
-// mechanics (JSON on stdin, exit 2 + stderr) but VS Code does not document
-// stop_hook_active or a block cap, so on top of that check a short per-session
-// cooldown file guards against loops. Gate: random sample only. Loop guards
-// kept verbatim from the SingHacks repo.
+// VS Code Copilot Stop hook. Exit 2 + stderr continues the agent (VS Code
+// treats that as a blocking reason). stop_hook_active is now documented; a
+// short cooldown remains as a second loop guard. Gate is signal-first once
+// passive capture fills the per-turn error counter.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -39,7 +38,7 @@ try {
   } catch {
     // if the guard cannot write, fall through and still inject once
   }
-  const d = decideReflection(input, { useSignal: false });
+  const d = decideReflection(input, { useSignal: true });
   if (!d.fire) exitAllow();
   process.stderr.write(buildInstruction({ submitPath, sessionId: d.sessionId, signal: d.signal, config: d.config }) + "\n");
   process.exit(2);

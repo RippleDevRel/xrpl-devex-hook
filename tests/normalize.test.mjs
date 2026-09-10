@@ -18,6 +18,8 @@ test("canonicalToolName maps Grok and Codex tools onto Claude names", () => {
   assert.equal(canonicalToolName("apply_patch"), "Edit");
   assert.equal(canonicalToolName("Bash"), "Bash");
   assert.equal(canonicalToolName("Shell"), "Bash");
+  assert.equal(canonicalToolName("run_in_terminal"), "Bash");
+  assert.equal(canonicalToolName("editFiles"), "Edit");
   assert.equal(canonicalToolName("Write"), "Write");
 });
 
@@ -136,6 +138,34 @@ test("Cursor afterShellExecution becomes a Bash PostToolUse", () => {
   assert.equal(n.tool_name, "Bash");
   assert.equal(n.tool_input.command, "node vault.js");
   assert.equal(n.tool_response.stdout, "VaultDeposit failed tecNO_PERMISSION");
+});
+
+test("Copilot run_in_terminal and string tool_response become Bash", () => {
+  const n = normalizeHookInput({
+    hook_event_name: "PostToolUse",
+    session_id: "vs1",
+    tool_name: "run_in_terminal",
+    tool_input: { command: "node vault.js" },
+    tool_response: "VaultDeposit failed tecNO_PERMISSION",
+  });
+  assert.equal(n.tool_name, "Bash");
+  assert.equal(n.tool_input.command, "node vault.js");
+  assert.equal(n.tool_response, "VaultDeposit failed tecNO_PERMISSION");
+});
+
+test("Copilot editFiles files[] becomes file_path", () => {
+  const n = normalizeHookInput({
+    tool_name: "editFiles",
+    tool_input: { files: ["src/vault-deposit.js"] },
+    tool_response: "File edited successfully VaultCreate",
+  });
+  assert.equal(n.tool_name, "Edit");
+  assert.equal(n.tool_input.file_path, "src/vault-deposit.js");
+});
+
+test("Copilot CLI userPromptSubmitted maps to UserPromptSubmit", () => {
+  const n = normalizeHookInput({ hook_event_name: "userPromptSubmitted", prompt: "xls-65" });
+  assert.equal(n.hook_event_name, "UserPromptSubmit");
 });
 
 test("Cursor afterFileEdit becomes an Edit PostToolUse", () => {
