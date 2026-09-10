@@ -1,0 +1,16 @@
+{
+  "name": "xrpl-devex-hook",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "XRPL DevEx Capture, participant side: Claude Code hooks and agent skills that record XRPL developer friction under a pseudonym. Zero dependencies, Node 18+.",
+  "license": "MIT",
+  "scripts": {
+    "status": "node hook/status.mjs",
+    "setup": "node hook/setup.mjs",
+    "check": "for f in $(find hook -name '*.mjs'); do node --check \"$f\" || exit 1; done && echo ok"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

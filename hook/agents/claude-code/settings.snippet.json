@@ -1,0 +1,32 @@
+{
+  "_comment": "Reference only. Run `node hook/setup.mjs --register claude-code` to write this with absolute paths into the project's .claude/settings.json, or `node hook/setup.mjs --emit-hooks --agent claude-code` to print it. $CLAUDE_PROJECT_DIR only works when this repo is the project root.",
+  "hooks": {
+    "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "SessionStart"], "timeout": 10 }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "UserPromptSubmit"], "timeout": 10 }] }],
+    "PostToolUse": [
+      { "matcher": "Bash|Write|Edit|Read|WebFetch|WebSearch", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse"], "timeout": 10 }] },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse", "--package-install"], "if": "Bash(npm install *)", "timeout": 10 },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse", "--package-install"], "if": "Bash(npm i *)", "timeout": 10 },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse", "--package-install"], "if": "Bash(pip install *)", "timeout": 10 },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse", "--package-install"], "if": "Bash(pip3 install *)", "timeout": 10 },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse", "--package-install"], "if": "Bash(yarn add *)", "timeout": 10 },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUse", "--package-install"], "if": "Bash(pnpm add *)", "timeout": 10 }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [{ "matcher": "Bash|Write|Edit", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PostToolUseFailure"], "timeout": 10 }] }],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "Stop"], "timeout": 20 },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/agents/claude-code/stop-hook.mjs"], "timeout": 15 }
+        ]
+      }
+    ],
+    "PreCompact": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "PreCompact"], "timeout": 10 }] }],
+    "SessionEnd": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "SessionEnd"], "timeout": 10 }] }]
+  }
+}

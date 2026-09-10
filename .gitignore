@@ -1,0 +1,22 @@
+# Local capture data written by the hooks (per participant project)
+.xrpl-devex/
+
+# Agent skill links created by skills/install.sh (project scoped, never committed)
+.claude/skills/
+.cursor/
+.codex/
+.claude/settings.local.json
+
+# Organizer exports
+exports/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
