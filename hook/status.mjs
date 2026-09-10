@@ -31,14 +31,30 @@ function count(file) {
 }
 
 function hooksRegistered() {
-  const file = path.join(project, ".claude", "settings.json");
-  if (!fs.existsSync(file)) return { file, registered: false, reason: "no .claude/settings.json in the project" };
-  try {
-    const text = fs.readFileSync(file, "utf8");
-    return { file, registered: text.includes("capture.mjs"), reflection: text.includes("stop-hook.mjs") };
-  } catch (err) {
-    return { file, registered: false, reason: err.message };
+  const candidates = [
+    path.join(project, ".claude", "settings.json"),
+    path.join(project, ".grok", "hooks", "xrpl-devex.json"),
+    path.join(project, ".codex", "hooks.json"),
+    path.join(project, ".cursor", "hooks.json"),
+  ];
+  const found = [];
+  let reflection = false;
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    try {
+      const text = fs.readFileSync(file, "utf8");
+      if (text.includes("capture.mjs") || text.includes("stop-hook.mjs")) {
+        found.push(file);
+        if (text.includes("stop-hook.mjs")) reflection = true;
+      }
+    } catch (err) {
+      return { file, registered: false, reason: err.message };
+    }
   }
+  if (!found.length) {
+    return { file: candidates[0], registered: false, reason: "no project hook file contains capture.mjs" };
+  }
+  return { file: found.join(", "), registered: true, reflection };
 }
 
 const pending = fs.existsSync(p.pendingAnalyses) ? fs.readdirSync(p.pendingAnalyses).filter((f) => f.endsWith(".json")).length : 0;
@@ -80,7 +96,7 @@ const status = {
   pending_analyses: pending,
   last_flush_at: state.last_flush_at,
   last_flush_result: state.last_flush_result,
-  passive_capture_note: "Passive hooks (prompts, tool results) run in Claude Code only. Cursor and Codex get the reflection hook and the skills.",
+  passive_capture_note: "Passive hooks (prompts, tool results) run in Claude Code, Grok and Codex. Cursor gets the reflection hook and the skills.",
 };
 
 if (argv.includes("--json")) {

@@ -22,7 +22,7 @@ import { loadConfig, isConfigured } from "./lib/config.mjs";
 import { consentText } from "./lib/consent.mjs";
 import { projectDir, dataPaths, HOOK_DIR, fwd } from "./lib/paths.mjs";
 import { loadIdentity, saveIdentity, createIdentity, declinedIdentity, normalizeTeam, isActive } from "./lib/identity.mjs";
-import { claudeCodeHooks, cursorHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, removeClaudeSettings } from "./lib/registrations.mjs";
+import { claudeCodeHooks, cursorHooks, grokHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, mergeCodexSettings, removeClaudeSettings } from "./lib/registrations.mjs";
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -58,6 +58,7 @@ function ensureGitignore() {
 function emitHooks({ agent, asJson }) {
   const all = {
     "claude-code": { target: ".claude/settings.json", body: claudeCodeHooks() },
+    grok: { target: ".grok/hooks/xrpl-devex.json", body: grokHooks() },
     cursor: { target: ".cursor/hooks.json", body: cursorHooks() },
     codex: { target: ".codex/hooks.json", body: codexHooks() },
     "vscode-copilot": { target: ".github/hooks/xrpl-devex.json", body: vscodeHooks() },
@@ -86,25 +87,74 @@ function emitHooks({ agent, asJson }) {
   out("");
   out("Codex alternative  ->  .codex/config.toml");
   out(codexToml());
-  out("Claude Code shortcut: node hook/setup.mjs --register claude-code merges the block above into the project settings.");
+  out("Register shortcut: node hook/setup.mjs --register claude-code|grok|codex writes the matching project file.");
 }
 
-function registerClaude(remove) {
-  const file = path.join(project, ".claude", "settings.json");
-  let existing = {};
-  if (fs.existsSync(file)) {
-    try {
-      existing = JSON.parse(fs.readFileSync(file, "utf8"));
-    } catch (err) {
-      process.stderr.write(`${file} is not valid JSON, fix it first: ${err.message}\n`);
-      process.exit(1);
-    }
+function readJsonFile(file) {
+  if (!fs.existsSync(file)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (err) {
+    process.stderr.write(`${file} is not valid JSON, fix it first: ${err.message}\n`);
+    process.exit(1);
   }
-  const next = remove ? removeClaudeSettings(existing) : mergeClaudeSettings(existing);
+}
+
+function writeJsonFile(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(next, null, 2) + "\n");
+  fs.writeFileSync(file, JSON.stringify(body, null, 2) + "\n");
+}
+
+function registerMerged(file, merge, remove, loadedNote) {
+  const existing = readJsonFile(file);
+  const next = remove ? removeClaudeSettings(existing) : merge(existing);
+  writeJsonFile(file, next);
   out(`${remove ? "Removed XRPL DevEx hooks from" : "Registered XRPL DevEx hooks in"} ${file}`);
-  if (!remove) out("Run /hooks in Claude Code to confirm they loaded. Hooks in a running session reload on the next turn.");
+  if (!remove) out(loadedNote);
+}
+
+function registerDedicated(file, body, remove, loadedNote) {
+  if (remove) {
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    out(`Removed XRPL DevEx hooks from ${file}`);
+    return;
+  }
+  writeJsonFile(file, body);
+  out(`Registered XRPL DevEx hooks in ${file}`);
+  out(loadedNote);
+}
+
+const REGISTERED_AGENTS = {
+  "claude-code": (remove) =>
+    registerMerged(
+      path.join(project, ".claude", "settings.json"),
+      mergeClaudeSettings,
+      remove,
+      "Run /hooks to confirm they loaded. A running session may need a restart. Trust the project if prompted.",
+    ),
+  grok: (remove) =>
+    registerDedicated(
+      path.join(project, ".grok", "hooks", "xrpl-devex.json"),
+      grokHooks(),
+      remove,
+      "Run /hooks-trust in this project, then /hooks to confirm they loaded.",
+    ),
+  codex: (remove) =>
+    registerMerged(
+      path.join(project, ".codex", "hooks.json"),
+      mergeCodexSettings,
+      remove,
+      "Trust the project hooks in Codex (/hooks) before they run.",
+    ),
+};
+
+function registerAgent(agent, remove) {
+  const run = REGISTERED_AGENTS[agent];
+  if (!run) {
+    process.stderr.write(`unknown agent ${agent}. Use one of: ${Object.keys(REGISTERED_AGENTS).join(", ")}. For cursor and vscode-copilot use --emit-hooks and paste the block.\n`);
+    process.exit(1);
+  }
+  run(remove);
 }
 
 function finish(identity) {
@@ -121,8 +171,10 @@ function finish(identity) {
   if (!isConfigured(config)) out("Note: hook/devex.config.json still has REPLACE-ME values. Events will buffer locally until the organizer fills in endpoint and ingest_key.");
   out("");
   out("Next: register the hooks for your agent, project scoped:");
-  out("  node hook/setup.mjs --register claude-code     (Claude Code, writes .claude/settings.json)");
-  out("  node hook/setup.mjs --emit-hooks               (Cursor, Codex, VS Code: paste the block for your agent)");
+  out("  node hook/setup.mjs --register claude-code     (writes .claude/settings.json)");
+  out("  node hook/setup.mjs --register grok            (writes .grok/hooks/xrpl-devex.json)");
+  out("  node hook/setup.mjs --register codex           (writes .codex/hooks.json)");
+  out("  node hook/setup.mjs --emit-hooks               (Cursor, VS Code: paste the block for your agent)");
   out("Then: bash skills/install.sh   and check with   node hook/status.mjs");
 }
 
@@ -184,15 +236,10 @@ if (has("--show-consent")) {
   out(consentText(config));
 } else if (has("--emit-hooks")) {
   emitHooks({ agent: val("--agent"), asJson: has("--json") });
-} else if (has("--register")) {
-  const agent = val("--register") || "claude-code";
-  if (agent !== "claude-code") {
-    process.stderr.write("--register only supports claude-code. For other agents use --emit-hooks and paste the block.\n");
-    process.exit(1);
-  }
-  registerClaude(false);
-} else if (has("--unregister")) {
-  registerClaude(true);
+} else if (has("--register") || has("--unregister")) {
+  const remove = has("--unregister");
+  const flag = remove ? "--unregister" : "--register";
+  registerAgent(val(flag) || "claude-code", remove);
 } else if (has("--non-interactive")) {
   nonInteractive();
 } else if (!process.stdin.isTTY) {

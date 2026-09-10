@@ -5,6 +5,8 @@
 .claude/skills/
 .cursor/
 .codex/
+.grok/hooks/
+.grok/skills/
 .claude/settings.local.json
 
 # Organizer exports

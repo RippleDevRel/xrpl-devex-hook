@@ -10,12 +10,12 @@ Four channels, one taxonomy (`docs/TAXONOMY.md`):
 
 | channel | mechanism | agents |
 |---|---|---|
-| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code |
-| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code (signal), Cursor, Codex, VS Code Copilot (sampled) |
-| `/xrpl-feedback` | you type what happened, the model classifies it, one-line ack | Claude Code, Cursor, Codex |
-| `/xrpl-session-analysis` | the model writes a report plus JSON from the transcript and hook evidence, asks before submitting | Claude Code, Cursor, Codex |
+| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code, Grok, Codex |
+| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code and Grok (signal), Codex (signal when the assistant message is present, otherwise sampled), Cursor, VS Code Copilot (sampled) |
+| `/xrpl-feedback` | you type what happened, the model classifies it, one-line ack | Claude Code, Grok, Cursor, Codex |
+| `/xrpl-session-analysis` | the model writes a report plus JSON from the transcript and hook evidence, asks before submitting | Claude Code, Grok, Cursor, Codex |
 
-Passive capture exists only in Claude Code in v2: Cursor and Codex do not expose the equivalent of `UserPromptSubmit` and `PostToolUse`. Organizers should know this skews the sample.
+Cursor still has no `UserPromptSubmit` / `PostToolUse` equivalent, so Cursor participants should use `/xrpl-feedback` and `/xrpl-session-analysis`. Codex PostToolUse covers Bash and `apply_patch` (not hosted web search).
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Passive capture exists only in Claude Code in v2: Cursor and Codex do not expose
 ## Two layouts
 
 - **This repo is the project.** You cloned the hook repo and work inside it. `REPO` and the project root are the same directory.
-- **Vendored.** The repo sits in a subfolder of your project (for example the event starter repo ships it). `REPO` is that subfolder; the project root is where your agent's `.claude/`, `.cursor/` or `.codex/` lives. Every command below works in both cases because `setup.mjs` emits absolute paths, which is the fix for the classic failure where `$CLAUDE_PROJECT_DIR/hook/...` resolves to the outer project and the hook dies with exit 127.
+- **Vendored.** The repo sits in a subfolder of your project (for example the event starter repo ships it). `REPO` is that subfolder; the project root is where your agent's `.claude/`, `.grok/`, `.cursor/` or `.codex/` lives. Every command below works in both cases because `setup.mjs` emits absolute paths, which is the fix for the classic failure where `$CLAUDE_PROJECT_DIR/hook/...` resolves to the outer project and the hook dies with exit 127.
 
 Data always lives in `<project root>/.xrpl-devex/` (gitignored, `setup.mjs` adds the line).
 
@@ -66,13 +66,27 @@ What gets registered: `SessionStart`, `UserPromptSubmit`, `PostToolUse` (matcher
 
 Run `/hooks` in Claude Code to confirm. A running session may need a restart to pick up new registrations.
 
+### Grok
+
+```bash
+node REPO/hook/setup.mjs --register grok
+```
+
+Writes `<project>/.grok/hooks/xrpl-devex.json` with absolute command strings (Grok does not use Claude's `command` + `args` split). Then `/hooks-trust` in the project; until the folder is trusted, Grok skips project hooks. `/hooks` lists them. Reference: `hook/agents/grok/hooks.snippet.json`. `--unregister grok` deletes that file.
+
+Grok stdin is camelCase (`toolName`, `stopHookActive`, `lastAssistantMessage`) and uses `run_terminal_command` rather than `Bash`. `capture.mjs` and the stop hook normalize that. Reload hooks from the Hooks tab (`r`) or start a new session.
+
 ### Cursor
 
 `node REPO/hook/setup.mjs --emit-hooks --agent cursor`, paste into `<project>/.cursor/hooks.json`. Reference: `hook/agents/cursor/hooks.snippet.json`. Keep `loop_limit: 2`.
 
 ### Codex
 
-`node REPO/hook/setup.mjs --emit-hooks --agent codex`, paste into `<project>/.codex/hooks.json`, or use the `[[hooks.Stop]]` form from `hook/agents/codex/config.toml.snippet` in the project's `.codex/config.toml`.
+```bash
+node REPO/hook/setup.mjs --register codex
+```
+
+Merges into `<project>/.codex/hooks.json` (SessionStart, UserPromptSubmit, PostToolUse for Bash and apply_patch, Stop, PreCompact, SessionEnd). Codex requires you to trust project hooks in `/hooks` before they run. SessionEnd timeout is 3 seconds (Codex's cap). Alternative: `--emit-hooks --agent codex`, or the TOML form in `hook/agents/codex/config.toml.snippet`. `--unregister codex` removes only ours.
 
 ### VS Code Copilot
 
@@ -93,7 +107,7 @@ bash REPO/skills/install.sh                       # this repo is the project
 bash REPO/skills/install.sh --project /path/to/project   # vendored
 ```
 
-Links (or copies on Windows) `xrpl-setup`, `xrpl-status`, `xrpl-feedback`, `xrpl-session-analysis` into `.claude/skills`, `.cursor/skills` and `.codex/skills`. Windows: `powershell -ExecutionPolicy Bypass -File REPO\skills\install.ps1`. Organizers add `--organizer` to also get `xrpl-team-report`.
+Links (or copies on Windows) `xrpl-setup`, `xrpl-status`, `xrpl-feedback`, `xrpl-session-analysis` into `.claude/skills`, `.cursor/skills`, `.codex/skills` and `.grok/skills`. Windows: `powershell -ExecutionPolicy Bypass -File REPO\skills\install.ps1`. Organizers add `--organizer` to also get `xrpl-team-report`.
 
 ## Step 4: test
 
@@ -138,11 +152,12 @@ If the organizer has not filled in `endpoint` and `ingest_key` yet, everything s
 ## Uninstall
 
 ```bash
-node REPO/hook/setup.mjs --unregister claude-code      # Claude Code hooks
-rm -rf <project>/.xrpl-devex                            # local data and identity
+node REPO/hook/setup.mjs --unregister claude-code
+node REPO/hook/setup.mjs --unregister grok
+node REPO/hook/setup.mjs --unregister codex
 ```
 
-For other agents, remove the block you pasted. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`.
+Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` directory) for local data. For Cursor / VS Code, remove the block you pasted. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`, `.grok/skills`.
 
 ## Safety notes
 
@@ -152,7 +167,7 @@ For other agents, remove the block you pasted. Skills: delete the `xrpl-*` entri
 
 ## Troubleshooting
 
-- `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register claude-code` and check `/hooks`.
+- `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register claude-code|grok|codex` and check `/hooks`. Grok also needs `/hooks-trust`.
 - Nothing ever gets sent, buffer keeps growing: `endpoint` or `ingest_key` still say `REPLACE-ME`, or the Worker is unreachable. Run `node REPO/hook/submit.mjs --retry-pending` to see the error.
 - Claude continues after a turn with an "XRPL developer experience check": that is the reflection hook doing its job. Set `XRPL_DEVEX_REFLECTION_SAMPLE=0` to reduce it to error-triggered turns only, or `/xrpl-setup disable` to remove all hooks.
 - Cursor loops: make sure `loop_limit` is set in `.cursor/hooks.json`.

@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 $SkillsDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot  = Split-Path -Parent $SkillsDir
 $ProjectRoot = if ($Project) { (Resolve-Path $Project).Path } else { $RepoRoot }
-$Targets   = @(".claude\skills", ".cursor\skills", ".codex\skills")
+$Targets   = @(".claude\skills", ".cursor\skills", ".codex\skills", ".grok\skills")
 
 function Install-SkillsFrom($base) {
   $count = 0

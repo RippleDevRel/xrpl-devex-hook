@@ -124,6 +124,23 @@ test("apply_patch stores the file name, not the patch body", () => {
   });
 });
 
+test("Grok stop-hook.mjs injects on camelCase XRPL error", () => {
+  withProject((dir) => {
+    const r = runNode(path.join(HOOK, "agents/grok/stop-hook.mjs"), [], {
+      dir,
+      input: {
+        hookEventName: "stop",
+        stopHookActive: false,
+        sessionId: "grok-stop-own",
+        cwd: dir,
+        lastAssistantMessage: "VaultDeposit failed with tecNO_PERMISSION",
+      },
+    });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /XRPL developer experience check/);
+  });
+});
+
 test("Grok Stop camelCase injects reflection on an XRPL error", () => {
   withProject((dir) => {
     const r = runNode(path.join(HOOK, "agents/claude-code/stop-hook.mjs"), [], {

@@ -24,10 +24,13 @@ Do this first, in order. Every step is project scoped: write only inside the pro
    ```
    or, if they decline, `CONSENT=no node REPO/hook/setup.mjs --non-interactive`, then stop here and build.
 
-5. Register the hooks for the agent you are running as, PROJECT scoped:
-   - Claude Code: `node REPO/hook/setup.mjs --register claude-code` (merges into `<project>/.claude/settings.json`, keeps other hooks).
-   - Cursor, Codex, VS Code Copilot: `node REPO/hook/setup.mjs --emit-hooks` and paste the matching block into `.cursor/hooks.json`, `.codex/hooks.json` or `.github/hooks/xrpl-devex.json` inside the project.
+5. Register the hooks for the agent you are running as, PROJECT scoped. Never write into a home directory config.
+   - Claude Code: `node REPO/hook/setup.mjs --register claude-code`
+   - Grok: `node REPO/hook/setup.mjs --register grok` (then tell the developer to run `/hooks-trust` in this project)
+   - Codex: `node REPO/hook/setup.mjs --register codex` (then tell the developer to trust the hooks in `/hooks`)
+   - Cursor, VS Code Copilot: `node REPO/hook/setup.mjs --emit-hooks` and paste the matching block into `.cursor/hooks.json` or `.github/hooks/xrpl-devex.json` inside the project.
    - Any other agent: follow "Any other agent" in `REPO/INSTALL.md`.
+   If you are unsure which agent you are, register the one whose product name you run under. Do not register all of them unless the developer asked.
 
 6. Install the skills: `bash REPO/skills/install.sh` (add `--project <project root>` if REPO is a subfolder of the project). On Windows: `powershell -ExecutionPolicy Bypass -File REPO\skills\install.ps1`.
 

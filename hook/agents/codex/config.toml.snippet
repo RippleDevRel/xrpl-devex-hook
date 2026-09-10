@@ -1,6 +1,15 @@
-# Alternative to hooks.json: put this in the project's .codex/config.toml (not the global ~/.codex/config.toml)
+# Alternative to hooks.json: put this in the project's .codex/config.toml
+# (not the global ~/.codex/config.toml). Prefer:
+#   node hook/setup.mjs --register codex
+# which writes .codex/hooks.json with absolute paths.
+# SessionEnd timeout must stay at 3 seconds (Codex cap).
 [[hooks.Stop]]
 matcher = ""
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "node /ABSOLUTE/PATH/TO/hook/capture.mjs --event Stop"
+timeout = 20
 
 [[hooks.Stop.hooks]]
 type = "command"

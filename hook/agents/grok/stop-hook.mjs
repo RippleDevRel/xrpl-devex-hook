@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// Codex Stop hook, reflection channel. Codex sends JSON on stdin
-// (stop_hook_active, last_assistant_message on recent versions) and injects
-// via exit 2 + stderr. Passive capture now also runs in Codex, so the per-turn
-// error counter is set when PostToolUse recorded an XRPL failure. The gate is
-// that counter, then the assistant message match, then the random sample.
+// Grok Stop hook, reflection channel. Grok's Stop gate honors exit 2 + stderr
+// the same way Claude Code does, so the inject path is identical. stdin is
+// camelCase (stopHookActive, lastAssistantMessage); readStdinJson normalizes
+// it. Fires on signal (turn error, allowlist match, or the random sample).
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
