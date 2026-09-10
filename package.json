@@ -8,7 +8,8 @@
   "scripts": {
     "status": "node hook/status.mjs",
     "setup": "node hook/setup.mjs",
-    "check": "for f in $(find hook -name '*.mjs'); do node --check \"$f\" || exit 1; done && echo ok"
+    "test": "node --test tests/*.test.mjs",
+    "check": "for f in $(find hook -name '*.mjs'); do node --check \"$f\" || exit 1; done && node --test tests/*.test.mjs && echo ok"
   },
   "engines": {
     "node": ">=18"
