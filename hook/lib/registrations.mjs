@@ -60,7 +60,7 @@ export function claudeCodeHooks() {
         {
           hooks: [
             capture("Stop", [], 20),
-            { type: "command", command: "node", args: [abs("agents/claude-code/stop-hook.mjs")], timeout: 15 },
+            { type: "command", command: "node", args: [abs("stop-hook.mjs")], timeout: 15 },
           ],
         },
       ],
@@ -88,7 +88,7 @@ export function grokHooks() {
         {
           hooks: [
             shellCapture("Stop", [], 20),
-            shellNode("agents/grok/stop-hook.mjs", [], 15),
+            shellNode("stop-hook.mjs", [], 15),
           ],
         },
       ],
@@ -112,7 +112,7 @@ export function codexHooks() {
         {
           hooks: [
             shellCapture("Stop", [], 20),
-            shellNode("agents/codex/stop-hook.mjs", [], 60),
+            shellNode("stop-hook.mjs", [], 60),
           ],
         },
       ],
@@ -123,7 +123,7 @@ export function codexHooks() {
 }
 
 export function codexToml() {
-  const stop = abs("agents/codex/stop-hook.mjs");
+  const stop = abs("stop-hook.mjs");
   const cap = abs("capture.mjs");
   return [
     "# Alternative to hooks.json: put this in the project's .codex/config.toml (not the global ~/.codex/config.toml).",

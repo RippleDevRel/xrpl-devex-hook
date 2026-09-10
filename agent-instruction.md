@@ -18,26 +18,18 @@ Do this first, in order. Every step is project scoped: write only inside the pro
    ```
    Do not continue until they answer. Do not guess the team name. Never ask for a real name or an email: none is collected, the developer gets a random pseudonym.
 
-4. Record the answer:
+4. Record the answer. This also writes project-local hooks for Claude Code, Grok and Codex (same `capture.mjs` + `stop-hook.mjs`) and installs the skills. Never write into a home directory config.
    ```bash
    TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive
    ```
    or, if they decline, `CONSENT=no node REPO/hook/setup.mjs --non-interactive`, then stop here and build.
 
-5. Register the hooks for the agent you are running as, PROJECT scoped. Never write into a home directory config.
-   - Claude Code: `node REPO/hook/setup.mjs --register claude-code`
-   - Grok: `node REPO/hook/setup.mjs --register grok` (then tell the developer to run `/hooks-trust` in this project)
-   - Codex: `node REPO/hook/setup.mjs --register codex` (then tell the developer to trust the hooks in `/hooks`)
-   - Cursor, VS Code Copilot: `node REPO/hook/setup.mjs --emit-hooks` and paste the matching block into `.cursor/hooks.json` or `.github/hooks/xrpl-devex.json` inside the project.
-   - Any other agent: follow "Any other agent" in `REPO/INSTALL.md`.
-   If you are unsure which agent you are, register the one whose product name you run under. Do not register all of them unless the developer asked.
-
-6. Install the skills: `bash REPO/skills/install.sh` (add `--project <project root>` if REPO is a subfolder of the project). On Windows: `powershell -ExecutionPolicy Bypass -File REPO\skills\install.ps1`.
-
-7. Confirm it works and tell the developer what you did in three lines:
+5. Confirm it works and tell the developer what you did in three lines:
    ```bash
    node REPO/hook/status.mjs
    ```
-   Mention that `/hooks` (or a session restart) confirms the hooks loaded, and that `/xrpl-feedback <text>` and `/xrpl-session-analysis` are available. Then go build.
+   Mention that they should trust the project (`/hooks-trust` in Grok, `/hooks` in Claude Code or Codex) so the hooks load, and that `/xrpl-feedback <text>` and `/xrpl-session-analysis` are available. Then go build.
+
+   Cursor and VS Code Copilot still need a paste: `node REPO/hook/setup.mjs --emit-hooks`. Any other agent: `REPO/INSTALL.md`.
 
 Full details, per-agent templates and the fallback path are in `REPO/INSTALL.md`. What is captured and what is not is in `REPO/docs/PRIVACY.md`.

@@ -22,7 +22,7 @@
       {
         "hooks": [
           { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/capture.mjs", "--event", "Stop"], "timeout": 20 },
-          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/agents/claude-code/stop-hook.mjs"], "timeout": 15 }
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/hook/stop-hook.mjs"], "timeout": 15 }
         ]
       }
     ],

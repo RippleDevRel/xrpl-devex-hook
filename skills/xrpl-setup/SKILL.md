@@ -15,7 +15,7 @@ The capture scripts live in a directory containing `hook/setup.mjs`. Find it in 
 2. Otherwise run `find . -path '*/hook/setup.mjs' -not -path '*/node_modules/*' | head -1` (vendored copy inside the project).
 3. Otherwise tell the developer to clone it first: `git clone https://github.com/RippleDevRel/xrpl-devex-hook.git` and stop.
 
-If `$ARGUMENTS` is `status`, run `node REPO/hook/status.mjs` and relay the output. If it is `disable`, unregister the agent you registered (`claude-code`, `grok` or `codex`) with `node REPO/hook/setup.mjs --unregister <agent>` and say that the hooks are removed and the identity file remains until the developer deletes `.xrpl-devex/identity.json`. Otherwise continue.
+If `$ARGUMENTS` is `status`, run `node REPO/hook/status.mjs` and relay the output. If it is `disable`, run `node REPO/hook/setup.mjs --unregister` and say that the project hooks are removed and the identity file remains until the developer deletes `.xrpl-devex/identity.json`. Otherwise continue.
 
 ## 2. Consent first, then team
 
@@ -31,16 +31,13 @@ Do not continue until they answer. Do not guess a team name from the repo, the f
 - Yes: `TEAM_NAME="<their team, as typed>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive`
 - No: `CONSENT=no node REPO/hook/setup.mjs --non-interactive`, then tell them nothing will be captured and stop.
 
-The script prints the pseudonym. It also adds `.xrpl-devex/` to the project `.gitignore`.
+The script prints the pseudonym, adds `.xrpl-devex/` to the project `.gitignore`, and registers project-local hooks.
 
-## 4. Register the hooks, project scoped
+## 4. Project hooks
 
-- Claude Code: `node REPO/hook/setup.mjs --register claude-code`
-- Grok: `node REPO/hook/setup.mjs --register grok`. Tell the developer to run `/hooks-trust` in this project.
-- Codex: `node REPO/hook/setup.mjs --register codex`. Tell the developer to trust the project hooks in `/hooks`.
-- Cursor, VS Code Copilot or another agent: run `node REPO/hook/setup.mjs --emit-hooks` and paste the block for that agent into its project-scoped hooks file. For agents without a hook that can inject into the model, paste the output of `node REPO/hook/print-instruction.mjs` into their instructions file. Never write into a home directory config.
+`CONSENT=yes` already registered Claude Code, Grok and Codex hooks in this project and installed the skills. If they are missing, run `node REPO/hook/setup.mjs --register`. Never write into a home directory config.
 
-Then install the skills: `bash REPO/skills/install.sh` (or `--project <project root>` when the repo is vendored).
+Cursor or VS Code Copilot: `node REPO/hook/setup.mjs --emit-hooks` and paste. Tell the developer to trust the folder (`/hooks-trust` or `/hooks`).
 
 ## 5. Verify and report
 

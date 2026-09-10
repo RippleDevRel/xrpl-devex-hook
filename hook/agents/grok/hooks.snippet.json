@@ -12,7 +12,7 @@
       {
         "hooks": [
           { "type": "command", "command": "node \"${REPO}/hook/capture.mjs\" --event Stop", "timeout": 20 },
-          { "type": "command", "command": "node \"${REPO}/hook/agents/grok/stop-hook.mjs\"", "timeout": 15 }
+          { "type": "command", "command": "node \"${REPO}/hook/stop-hook.mjs\"", "timeout": 15 }
         ]
       }
     ],

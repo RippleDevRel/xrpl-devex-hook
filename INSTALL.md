@@ -40,7 +40,7 @@ node REPO/hook/setup.mjs
 
 Shows the consent paragraph, asks yes or no, then the team name. Writes `.xrpl-devex/identity.json` with a random pseudonym like `plain-ibex-69`. No real name.
 
-### AI agent
+### Agent
 
 Do not launch the interactive prompt in a non-interactive shell. Show the developer the text from `node REPO/hook/setup.mjs --show-consent`, ask for consent and team name in chat, then:
 
@@ -53,6 +53,16 @@ TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive
 Optional: `--project /path/to/project` when running from elsewhere.
 
 ## Step 2: register the hooks (project scoped, never global)
+
+Consent (`--non-interactive` or the interactive prompt) already does this. To do it on its own:
+
+```bash
+node REPO/hook/setup.mjs --register
+```
+
+Writes Claude Code, Grok and Codex hook files inside the project (never `~/.claude` or `~/.grok`) and installs the skills. All three call the same `hook/capture.mjs` and `hook/stop-hook.mjs`. `--unregister` removes them. `--register grok` (or `claude-code`, `codex`) limits it to one agent.
+
+Trust the project before hooks run: `/hooks-trust` in Grok, `/hooks` in Claude Code and Codex.
 
 ### Claude Code
 
@@ -152,9 +162,7 @@ If the organizer has not filled in `endpoint` and `ingest_key` yet, everything s
 ## Uninstall
 
 ```bash
-node REPO/hook/setup.mjs --unregister claude-code
-node REPO/hook/setup.mjs --unregister grok
-node REPO/hook/setup.mjs --unregister codex
+node REPO/hook/setup.mjs --unregister
 ```
 
 Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` directory) for local data. For Cursor / VS Code, remove the block you pasted. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`, `.grok/skills`.
@@ -167,7 +175,7 @@ Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` d
 
 ## Troubleshooting
 
-- `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register claude-code|grok|codex` and check `/hooks`. Grok also needs `/hooks-trust`.
+- `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register` and check `/hooks`. Grok also needs `/hooks-trust`.
 - Nothing ever gets sent, buffer keeps growing: `endpoint` or `ingest_key` still say `REPLACE-ME`, or the Worker is unreachable. Run `node REPO/hook/submit.mjs --retry-pending` to see the error.
 - Claude continues after a turn with an "XRPL developer experience check": that is the reflection hook doing its job. Set `XRPL_DEVEX_REFLECTION_SAMPLE=0` to reduce it to error-triggered turns only, or `/xrpl-setup disable` to remove all hooks.
 - Cursor loops: make sure `loop_limit` is set in `.cursor/hooks.json`.

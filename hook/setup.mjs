@@ -6,8 +6,9 @@
 //   CONSENT=no node hook/setup.mjs --non-interactive        records the refusal
 //   node hook/setup.mjs --emit-hooks         print registrations, absolute paths
 //   node hook/setup.mjs --emit-hooks --agent claude-code --json
-//   node hook/setup.mjs --register claude-code   merge into <project>/.claude/settings.json
-//   node hook/setup.mjs --unregister claude-code
+//   node hook/setup.mjs --register               project hooks for Claude Code, Grok and Codex
+//   node hook/setup.mjs --register grok          one agent only
+//   node hook/setup.mjs --unregister             remove the project hooks this setup wrote
 //   node hook/setup.mjs --show-consent
 //   node hook/setup.mjs --project /path/to/project   (default: CLAUDE_PROJECT_DIR or cwd)
 //
@@ -15,12 +16,13 @@
 // consented_at, client_version } or { declined: true }. No real name, ever.
 // Also appends .xrpl-devex/ to the project's .gitignore.
 
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { loadConfig, isConfigured } from "./lib/config.mjs";
 import { consentText } from "./lib/consent.mjs";
-import { projectDir, dataPaths, HOOK_DIR, fwd } from "./lib/paths.mjs";
+import { projectDir, dataPaths, HOOK_DIR, REPO_DIR, fwd } from "./lib/paths.mjs";
 import { loadIdentity, saveIdentity, createIdentity, declinedIdentity, normalizeTeam, isActive } from "./lib/identity.mjs";
 import { claudeCodeHooks, cursorHooks, grokHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, mergeCodexSettings, removeClaudeSettings } from "./lib/registrations.mjs";
 
@@ -28,7 +30,9 @@ const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
 const val = (f) => {
   const i = argv.indexOf(f);
-  return i !== -1 ? argv[i + 1] : undefined;
+  const n = i !== -1 ? argv[i + 1] : undefined;
+  if (!n || n.startsWith("-")) return undefined;
+  return n;
 };
 
 if (val("--project")) process.env.XRPL_DEVEX_PROJECT_DIR = path.resolve(val("--project"));
@@ -87,7 +91,7 @@ function emitHooks({ agent, asJson }) {
   out("");
   out("Codex alternative  ->  .codex/config.toml");
   out(codexToml());
-  out("Register shortcut: node hook/setup.mjs --register claude-code|grok|codex writes the matching project file.");
+  out("Register shortcut: node hook/setup.mjs --register writes Claude Code, Grok and Codex project files.");
 }
 
 function readJsonFile(file) {
@@ -105,56 +109,64 @@ function writeJsonFile(file, body) {
   fs.writeFileSync(file, JSON.stringify(body, null, 2) + "\n");
 }
 
-function registerMerged(file, merge, remove, loadedNote) {
+function registerMerged(file, merge, remove) {
   const existing = readJsonFile(file);
   const next = remove ? removeClaudeSettings(existing) : merge(existing);
   writeJsonFile(file, next);
-  out(`${remove ? "Removed XRPL DevEx hooks from" : "Registered XRPL DevEx hooks in"} ${file}`);
-  if (!remove) out(loadedNote);
+  return file;
 }
 
-function registerDedicated(file, body, remove, loadedNote) {
+function registerDedicated(file, body, remove) {
   if (remove) {
     if (fs.existsSync(file)) fs.unlinkSync(file);
-    out(`Removed XRPL DevEx hooks from ${file}`);
-    return;
+    return file;
   }
   writeJsonFile(file, body);
-  out(`Registered XRPL DevEx hooks in ${file}`);
-  out(loadedNote);
+  return file;
 }
 
 const REGISTERED_AGENTS = {
   "claude-code": (remove) =>
-    registerMerged(
-      path.join(project, ".claude", "settings.json"),
-      mergeClaudeSettings,
-      remove,
-      "Run /hooks to confirm they loaded. A running session may need a restart. Trust the project if prompted.",
-    ),
+    registerMerged(path.join(project, ".claude", "settings.json"), mergeClaudeSettings, remove),
   grok: (remove) =>
-    registerDedicated(
-      path.join(project, ".grok", "hooks", "xrpl-devex.json"),
-      grokHooks(),
-      remove,
-      "Run /hooks-trust in this project, then /hooks to confirm they loaded.",
-    ),
+    registerDedicated(path.join(project, ".grok", "hooks", "xrpl-devex.json"), grokHooks(), remove),
   codex: (remove) =>
-    registerMerged(
-      path.join(project, ".codex", "hooks.json"),
-      mergeCodexSettings,
-      remove,
-      "Trust the project hooks in Codex (/hooks) before they run.",
-    ),
+    registerMerged(path.join(project, ".codex", "hooks.json"), mergeCodexSettings, remove),
 };
 
+const PROJECT_AGENTS = Object.keys(REGISTERED_AGENTS);
+
 function registerAgent(agent, remove) {
-  const run = REGISTERED_AGENTS[agent];
-  if (!run) {
-    process.stderr.write(`unknown agent ${agent}. Use one of: ${Object.keys(REGISTERED_AGENTS).join(", ")}. For cursor and vscode-copilot use --emit-hooks and paste the block.\n`);
-    process.exit(1);
+  const names = !agent || agent === "all" ? PROJECT_AGENTS : [agent];
+  for (const name of names) {
+    if (!REGISTERED_AGENTS[name]) {
+      process.stderr.write(`unknown agent ${name}. Use one of: all, ${PROJECT_AGENTS.join(", ")}. For cursor and vscode-copilot use --emit-hooks and paste the block.\n`);
+      process.exit(1);
+    }
   }
-  run(remove);
+  const files = names.map((name) => REGISTERED_AGENTS[name](remove));
+  const verb = remove ? "Removed" : "Registered";
+  out(`${verb} project hooks (${names.join(", ")}):`);
+  for (const file of files) out(`  ${file}`);
+  if (!remove) {
+    out("These files stay inside the project. Trust the folder before they run (/hooks-trust or /hooks).");
+  }
+}
+
+function installSkills() {
+  const sh = path.join(REPO_DIR, "skills", "install.sh");
+  const r = spawnSync("bash", [sh, "--project", project], { encoding: "utf8" });
+  if (r.status !== 0) {
+    out("Skills were not installed. Run: bash skills/install.sh --project " + project);
+    if (r.stderr) out(r.stderr.trim());
+    return;
+  }
+  if (r.stdout) out(r.stdout.trim());
+}
+
+function enableProject() {
+  registerAgent("all", false);
+  installSkills();
 }
 
 function finish(identity) {
@@ -170,12 +182,10 @@ function finish(identity) {
   if (ensureGitignore()) out("Added .xrpl-devex/ to the project .gitignore.");
   if (!isConfigured(config)) out("Note: hook/devex.config.json still has REPLACE-ME values. Events will buffer locally until the organizer fills in endpoint and ingest_key.");
   out("");
-  out("Next: register the hooks for your agent, project scoped:");
-  out("  node hook/setup.mjs --register claude-code     (writes .claude/settings.json)");
-  out("  node hook/setup.mjs --register grok            (writes .grok/hooks/xrpl-devex.json)");
-  out("  node hook/setup.mjs --register codex           (writes .codex/hooks.json)");
-  out("  node hook/setup.mjs --emit-hooks               (Cursor, VS Code: paste the block for your agent)");
-  out("Then: bash skills/install.sh   and check with   node hook/status.mjs");
+  enableProject();
+  out("");
+  out("Check with: node hook/status.mjs");
+  out("Disable with: node hook/setup.mjs --unregister");
 }
 
 function nonInteractive() {
@@ -239,7 +249,8 @@ if (has("--show-consent")) {
 } else if (has("--register") || has("--unregister")) {
   const remove = has("--unregister");
   const flag = remove ? "--unregister" : "--register";
-  registerAgent(val(flag) || "claude-code", remove);
+  registerAgent(val(flag) || "all", remove);
+  if (!remove && (!val(flag) || val(flag) === "all")) installSkills();
 } else if (has("--non-interactive")) {
   nonInteractive();
 } else if (!process.stdin.isTTY) {

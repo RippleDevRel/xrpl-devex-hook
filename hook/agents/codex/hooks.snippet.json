@@ -12,7 +12,7 @@
       {
         "hooks": [
           { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event Stop", "timeout": 20 },
-          { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/agents/codex/stop-hook.mjs\"", "timeout": 60 }
+          { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/stop-hook.mjs\"", "timeout": 60 }
         ]
       }
     ],

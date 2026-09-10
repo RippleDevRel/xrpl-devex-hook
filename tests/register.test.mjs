@@ -36,7 +36,8 @@ test("--register grok writes command-string hooks, not command+args", () => {
     assert.match(post.command, /capture\.mjs" --event PostToolUse$/);
     assert.match(body.hooks.PostToolUse[0].matcher, /run_terminal_command/);
     const stop = body.hooks.Stop[0].hooks.map((h) => h.command).join("\n");
-    assert.match(stop, /agents\/grok\/stop-hook\.mjs/);
+    assert.match(stop, /stop-hook\.mjs/);
+    assert.doesNotMatch(stop, /agents\/grok\/stop-hook/);
   });
 });
 
@@ -70,6 +71,43 @@ test("--unregister grok deletes the dedicated file", () => {
     const r = run(SETUP, ["--unregister", "grok"], dir);
     assert.equal(r.status, 0, r.stderr);
     assert.equal(fs.existsSync(file), false);
+  });
+});
+
+test("--register with no agent writes Claude, Grok and Codex project files", () => {
+  withProject((dir) => {
+    const r = run(SETUP, ["--register"], dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".codex", "hooks.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".claude", "settings.json")), true);
+    const grok = JSON.parse(fs.readFileSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json"), "utf8"));
+    const stop = grok.hooks.Stop[0].hooks.map((h) => h.command).join("\n");
+    assert.match(stop, /hook\/stop-hook\.mjs/);
+  });
+});
+
+test("--non-interactive consent registers project hooks", () => {
+  withProject((dir) => {
+    const r = spawnSync(process.execPath, [SETUP, "--non-interactive", "--project", dir], {
+      encoding: "utf8",
+      env: { ...process.env, CONSENT: "yes", TEAM_NAME: "local-trial" },
+    });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.equal(fs.existsSync(path.join(dir, ".xrpl-devex", "identity.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".codex", "hooks.json")), true);
+  });
+});
+
+test("--unregister with no agent removes Grok file and strips Claude/Codex", () => {
+  withProject((dir) => {
+    run(SETUP, ["--register"], dir);
+    const r = run(SETUP, ["--unregister"], dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), false);
+    const claude = JSON.parse(fs.readFileSync(path.join(dir, ".claude", "settings.json"), "utf8"));
+    assert.equal(JSON.stringify(claude).includes("capture.mjs"), false);
   });
 });
 
