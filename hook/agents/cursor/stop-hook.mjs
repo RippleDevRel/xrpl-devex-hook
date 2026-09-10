@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // Cursor `stop` hook, reflection channel. Returns a followup_message that
-// Cursor auto-submits to its own model. Cursor's Stop input carries neither the
-// assistant message nor our per-turn error counter, so the gate is the random
-// sample only. Loop guards kept verbatim from the SingHacks repo: loop_count
-// on the injected follow-up turn, plus loop_limit in hooks.json.
+// Cursor auto-submits to its own model. Passive capture now fills the per-turn
+// error counter, so the gate is signal-first (then the random sample). Loop
+// guards: loop_count on the injected follow-up turn, plus loop_limit in hooks.json.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +23,7 @@ try {
   if (!input) emit({});
   // Do not inject again on our own follow-up turn.
   if (Number(input.loop_count || 0) > 0) emit({});
-  const d = decideReflection({ ...input, session_id: input.conversation_id || input.session_id }, { useSignal: false });
+  const d = decideReflection(input, { useSignal: true });
   if (!d.fire) emit({});
   emit({ followup_message: buildInstruction({ submitPath, sessionId: d.sessionId, signal: d.signal, config: d.config }) });
 } catch {

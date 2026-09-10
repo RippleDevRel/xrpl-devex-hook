@@ -1,11 +1,17 @@
 {
+  "_comment": "Reference only. Prefer `node hook/setup.mjs --register cursor` (or `--register` for every agent). Cursor uses version 1 and a flat command list. Keep loop_limit on stop.",
   "version": 1,
   "hooks": {
+    "sessionStart": [{ "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event SessionStart", "timeout": 10 }],
+    "beforeSubmitPrompt": [{ "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event UserPromptSubmit", "timeout": 10 }],
+    "afterShellExecution": [
+      { "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse", "timeout": 10 },
+      { "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse --package-install", "timeout": 10 }
+    ],
+    "afterFileEdit": [{ "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse", "timeout": 10 }],
     "stop": [
-      {
-        "command": "node /ABSOLUTE/PATH/TO/hook/agents/cursor/stop-hook.mjs",
-        "loop_limit": 2
-      }
+      { "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event Stop", "timeout": 20 },
+      { "command": "node \"/ABSOLUTE/PATH/TO/hook/agents/cursor/stop-hook.mjs\"", "timeout": 15, "loop_limit": 2 }
     ]
   }
 }

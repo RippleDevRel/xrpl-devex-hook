@@ -74,16 +74,22 @@ test("--unregister grok deletes the dedicated file", () => {
   });
 });
 
-test("--register with no agent writes Claude, Grok and Codex project files", () => {
+test("--register with no agent writes Claude, Grok, Codex and Cursor project files", () => {
   withProject((dir) => {
     const r = run(SETUP, ["--register"], dir);
     assert.equal(r.status, 0, r.stderr);
     assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".codex", "hooks.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".claude", "settings.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".cursor", "hooks.json")), true);
     const grok = JSON.parse(fs.readFileSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json"), "utf8"));
     const stop = grok.hooks.Stop[0].hooks.map((h) => h.command).join("\n");
     assert.match(stop, /hook\/stop-hook\.mjs/);
+    const cursor = JSON.parse(fs.readFileSync(path.join(dir, ".cursor", "hooks.json"), "utf8"));
+    assert.equal(cursor.version, 1);
+    assert.ok(cursor.hooks.beforeSubmitPrompt);
+    assert.ok(cursor.hooks.afterShellExecution);
+    assert.equal(cursor.hooks.stop[1].loop_limit, 2);
   });
 });
 
@@ -97,6 +103,7 @@ test("--non-interactive consent registers project hooks", () => {
     assert.equal(fs.existsSync(path.join(dir, ".xrpl-devex", "identity.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".codex", "hooks.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".cursor", "hooks.json")), true);
   });
 });
 
@@ -108,6 +115,25 @@ test("--unregister with no agent removes Grok file and strips Claude/Codex", () 
     assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), false);
     const claude = JSON.parse(fs.readFileSync(path.join(dir, ".claude", "settings.json"), "utf8"));
     assert.equal(JSON.stringify(claude).includes("capture.mjs"), false);
+  });
+});
+
+test("--register cursor keeps unrelated Cursor hooks", () => {
+  withProject((dir) => {
+    const file = path.join(dir, ".cursor", "hooks.json");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        hooks: { beforeShellExecution: [{ command: "echo keep-me" }] },
+      }),
+    );
+    run(SETUP, ["--register", "cursor"], dir);
+    const body = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(body.hooks.beforeShellExecution[0].command, "echo keep-me");
+    assert.ok(body.hooks.afterShellExecution);
+    assert.ok(body.hooks.stop);
   });
 });
 

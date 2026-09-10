@@ -70,8 +70,32 @@ export function claudeCodeHooks() {
   };
 }
 
+function cursorCmd(rel, extra = [], timeout = 10) {
+  const h = shellNode(rel, extra, timeout);
+  return { command: h.command, timeout };
+}
+
 export function cursorHooks() {
-  return { version: 1, hooks: { stop: [{ command: `node "${abs("agents/cursor/stop-hook.mjs")}"`, loop_limit: 2 }] } };
+  return {
+    version: 1,
+    hooks: {
+      sessionStart: [cursorCmd("capture.mjs", ["--event", "SessionStart"])],
+      beforeSubmitPrompt: [cursorCmd("capture.mjs", ["--event", "UserPromptSubmit"])],
+      afterShellExecution: [
+        cursorCmd("capture.mjs", ["--event", "PostToolUse"]),
+        cursorCmd("capture.mjs", ["--event", "PostToolUse", "--package-install"]),
+      ],
+      afterMCPExecution: [cursorCmd("capture.mjs", ["--event", "PostToolUse"])],
+      afterFileEdit: [cursorCmd("capture.mjs", ["--event", "PostToolUse"])],
+      postToolUseFailure: [cursorCmd("capture.mjs", ["--event", "PostToolUseFailure"])],
+      preCompact: [cursorCmd("capture.mjs", ["--event", "PreCompact"])],
+      sessionEnd: [cursorCmd("capture.mjs", ["--event", "SessionEnd"], 10)],
+      stop: [
+        cursorCmd("capture.mjs", ["--event", "Stop"], 20),
+        { command: `node "${abs("agents/cursor/stop-hook.mjs")}"`, timeout: 15, loop_limit: 2 },
+      ],
+    },
+  };
 }
 
 export function grokHooks() {
@@ -222,6 +246,35 @@ export function mergeCodexSettings(existing) {
 
 export function removeClaudeSettings(existing) {
   const out = stripOurs(existing);
+  if (!Object.keys(out.hooks).length) delete out.hooks;
+  return out;
+}
+
+function stripCursorOurs(existing) {
+  const out = existing && typeof existing === "object" ? { ...existing } : {};
+  out.version = 1;
+  const hooks = { ...(out.hooks && typeof out.hooks === "object" ? out.hooks : {}) };
+  for (const [event, list] of Object.entries(hooks)) {
+    if (!Array.isArray(list)) continue;
+    hooks[event] = list.filter((h) => !isOurs(h));
+    if (!hooks[event].length) delete hooks[event];
+  }
+  out.hooks = hooks;
+  return out;
+}
+
+export function mergeCursorSettings(existing) {
+  const out = stripCursorOurs(existing);
+  const hooks = out.hooks;
+  for (const [event, list] of Object.entries(cursorHooks().hooks)) {
+    hooks[event] = [...(hooks[event] || []), ...list];
+  }
+  out.hooks = hooks;
+  return out;
+}
+
+export function removeCursorSettings(existing) {
+  const out = stripCursorOurs(existing);
   if (!Object.keys(out.hooks).length) delete out.hooks;
   return out;
 }

@@ -96,7 +96,7 @@ const status = {
   pending_analyses: pending,
   last_flush_at: state.last_flush_at,
   last_flush_result: state.last_flush_result,
-  passive_capture_note: "Passive hooks (prompts, tool results) run in Claude Code, Grok and Codex. Cursor gets the reflection hook and the skills.",
+  passive_capture_note: "Passive hooks (prompts, tool results) run in Claude Code, Grok, Codex and Cursor.",
 };
 
 if (argv.includes("--json")) {

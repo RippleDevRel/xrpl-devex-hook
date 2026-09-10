@@ -10,12 +10,12 @@ Four channels, one taxonomy (`docs/TAXONOMY.md`):
 
 | channel | mechanism | agents |
 |---|---|---|
-| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code, Grok, Codex |
-| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code and Grok (signal), Codex (signal when the assistant message is present, otherwise sampled), Cursor, VS Code Copilot (sampled) |
+| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code, Grok, Codex, Cursor |
+| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code, Grok, Codex and Cursor (signal), VS Code Copilot (sampled) |
 | `/xrpl-feedback` | you type what happened, the model classifies it, one-line ack | Claude Code, Grok, Cursor, Codex |
 | `/xrpl-session-analysis` | the model writes a report plus JSON from the transcript and hook evidence, asks before submitting | Claude Code, Grok, Cursor, Codex |
 
-Cursor still has no `UserPromptSubmit` / `PostToolUse` equivalent, so Cursor participants should use `/xrpl-feedback` and `/xrpl-session-analysis`. Codex PostToolUse covers Bash and `apply_patch` (not hosted web search).
+Cursor maps `beforeSubmitPrompt`, `afterShellExecution`, `afterFileEdit` and `afterMCPExecution` onto the same capture script. Codex PostToolUse covers Bash and `apply_patch` (not hosted web search).
 
 ## Prerequisites
 
@@ -60,9 +60,9 @@ Consent (`--non-interactive` or the interactive prompt) already does this. To do
 node REPO/hook/setup.mjs --register
 ```
 
-Writes Claude Code, Grok and Codex hook files inside the project (never `~/.claude` or `~/.grok`) and installs the skills. All three call the same `hook/capture.mjs` and `hook/stop-hook.mjs`. `--unregister` removes them. `--register grok` (or `claude-code`, `codex`) limits it to one agent.
+Writes Claude Code, Grok, Codex and Cursor hook files inside the project (never `~/.claude` or `~/.grok`) and installs the skills. They call the same `hook/capture.mjs` (Cursor stop uses `agents/cursor/stop-hook.mjs` because it injects via `followup_message`). `--unregister` removes them. `--register grok` (or `claude-code`, `codex`, `cursor`) limits it to one agent.
 
-Trust the project before hooks run: `/hooks-trust` in Grok, `/hooks` in Claude Code and Codex.
+Trust the project before hooks run: `/hooks-trust` in Grok, `/hooks` in Claude Code, Codex and Cursor.
 
 ### Claude Code
 
@@ -88,7 +88,11 @@ Grok stdin is camelCase (`toolName`, `stopHookActive`, `lastAssistantMessage`) a
 
 ### Cursor
 
-`node REPO/hook/setup.mjs --emit-hooks --agent cursor`, paste into `<project>/.cursor/hooks.json`. Reference: `hook/agents/cursor/hooks.snippet.json`. Keep `loop_limit: 2`.
+```bash
+node REPO/hook/setup.mjs --register cursor
+```
+
+Merges into `<project>/.cursor/hooks.json` (version 1): `sessionStart`, `beforeSubmitPrompt`, `afterShellExecution` (plus package-install), `afterMCPExecution`, `afterFileEdit`, `postToolUseFailure`, `preCompact`, `sessionEnd`, and `stop` (`loop_limit: 2` on the reflection handler). Cursor stdin uses `conversation_id`, `workspace_roots`, and top-level `command`/`output` on shell events; capture normalizes that. `--unregister cursor` removes only ours. Alternative: `--emit-hooks --agent cursor`.
 
 ### Codex
 

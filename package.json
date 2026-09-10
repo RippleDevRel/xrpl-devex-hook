@@ -3,7 +3,7 @@
   "version": "2.1.0",
   "private": true,
   "type": "module",
-  "description": "XRPL DevEx Capture, participant side: Claude Code, Grok and Codex hooks plus agent skills that record XRPL developer friction under a pseudonym. Zero dependencies, Node 18+.",
+  "description": "XRPL DevEx Capture, participant side: Claude Code, Grok, Codex and Cursor hooks plus agent skills that record XRPL developer friction under a pseudonym. Zero dependencies, Node 18+.",
   "license": "MIT",
   "scripts": {
     "status": "node hook/status.mjs",

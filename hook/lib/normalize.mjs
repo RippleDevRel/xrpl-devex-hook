@@ -5,6 +5,7 @@ const TOOL_NAME_ALIASES = {
   run_terminal_command: "Bash",
   bash: "Bash",
   shell: "Bash",
+  Shell: "Bash",
   local_shell: "Bash",
   exec_command: "Bash",
   write: "Write",
@@ -32,8 +33,22 @@ export function canonicalToolName(name) {
   return aliased || name;
 }
 
+const EVENT_ALIASES = {
+  sessionStart: "SessionStart",
+  sessionEnd: "SessionEnd",
+  beforeSubmitPrompt: "UserPromptSubmit",
+  afterShellExecution: "PostToolUse",
+  afterMCPExecution: "PostToolUse",
+  afterFileEdit: "PostToolUse",
+  postToolUse: "PostToolUse",
+  postToolUseFailure: "PostToolUseFailure",
+  preCompact: "PreCompact",
+  stop: "Stop",
+};
+
 export function toPascalEventName(name) {
   if (typeof name !== "string" || !name) return name;
+  if (EVENT_ALIASES[name]) return EVENT_ALIASES[name];
   if (/^[A-Z][A-Za-z0-9]+$/.test(name)) return name;
   return name
     .split(/[_-]/)
@@ -82,6 +97,9 @@ export function normalizeHookInput(input) {
   if (typeof sessionId === "string" && sessionId) out.session_id = sessionId;
   const cwd = firstDefined(input, ["cwd", "workspaceRoot", "workspace_root"]);
   if (typeof cwd === "string" && cwd) out.cwd = cwd;
+  else if (Array.isArray(input.workspace_roots) && typeof input.workspace_roots[0] === "string") {
+    out.cwd = input.workspace_roots[0];
+  }
   out.stop_hook_active = firstDefined(input, ["stop_hook_active", "stopHookActive"]) === true;
   const msg = firstDefined(input, ["last_assistant_message", "lastAssistantMessage"]);
   if (typeof msg === "string") out.last_assistant_message = msg;
@@ -89,12 +107,24 @@ export function normalizeHookInput(input) {
   if (typeof eventName === "string" && eventName) out.hook_event_name = toPascalEventName(eventName);
   const prompt = firstDefined(input, ["prompt", "user_prompt", "userPrompt"]);
   if (typeof prompt === "string") out.prompt = prompt;
-  const rawTool = firstDefined(input, ["tool_name", "toolName"]);
+  let rawTool = firstDefined(input, ["tool_name", "toolName"]);
+  let toolInput = firstDefined(input, ["tool_input", "toolInput", "input"]);
+  if (!rawTool && typeof input.command === "string" && !out.prompt) {
+    rawTool = "Bash";
+    toolInput = { ...(toolInput && typeof toolInput === "object" ? toolInput : {}), command: input.command };
+  }
+  if (!rawTool && typeof input.file_path === "string" && Array.isArray(input.edits)) {
+    rawTool = "Edit";
+    const olds = input.edits.map((e) => e && e.old_string).filter((s) => typeof s === "string").join("\n");
+    const news = input.edits.map((e) => e && e.new_string).filter((s) => typeof s === "string").join("\n");
+    toolInput = { file_path: input.file_path, old_string: olds, new_string: news };
+  }
   if (typeof rawTool === "string" && rawTool) out.tool_name = canonicalToolName(rawTool);
-  const toolInput = firstDefined(input, ["tool_input", "toolInput"]);
   if (toolInput !== undefined) out.tool_input = normalizeToolInput(toolInput, rawTool);
   const toolResponse = firstDefined(input, ["tool_response", "toolResult", "tool_result"]);
   if (toolResponse !== undefined) out.tool_response = normalizeToolResponse(toolResponse);
+  else if (typeof input.output === "string") out.tool_response = { stdout: input.output };
+  else if (typeof input.tool_output === "string") out.tool_response = { stdout: input.tool_output };
   if (typeof input.error !== "string") {
     const err = firstDefined(input, ["errorDetails", "error_details"]);
     if (typeof err === "string") out.error = err;

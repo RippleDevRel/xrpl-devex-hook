@@ -6,7 +6,7 @@
 //   CONSENT=no node hook/setup.mjs --non-interactive        records the refusal
 //   node hook/setup.mjs --emit-hooks         print registrations, absolute paths
 //   node hook/setup.mjs --emit-hooks --agent claude-code --json
-//   node hook/setup.mjs --register               project hooks for Claude Code, Grok and Codex
+//   node hook/setup.mjs --register               project hooks for Claude Code, Grok, Codex and Cursor
 //   node hook/setup.mjs --register grok          one agent only
 //   node hook/setup.mjs --unregister             remove the project hooks this setup wrote
 //   node hook/setup.mjs --show-consent
@@ -24,7 +24,7 @@ import { loadConfig, isConfigured } from "./lib/config.mjs";
 import { consentText } from "./lib/consent.mjs";
 import { projectDir, dataPaths, HOOK_DIR, REPO_DIR, fwd } from "./lib/paths.mjs";
 import { loadIdentity, saveIdentity, createIdentity, declinedIdentity, normalizeTeam, isActive } from "./lib/identity.mjs";
-import { claudeCodeHooks, cursorHooks, grokHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, mergeCodexSettings, removeClaudeSettings } from "./lib/registrations.mjs";
+import { claudeCodeHooks, cursorHooks, grokHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, mergeCodexSettings, mergeCursorSettings, removeClaudeSettings, removeCursorSettings } from "./lib/registrations.mjs";
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -91,7 +91,7 @@ function emitHooks({ agent, asJson }) {
   out("");
   out("Codex alternative  ->  .codex/config.toml");
   out(codexToml());
-  out("Register shortcut: node hook/setup.mjs --register writes Claude Code, Grok and Codex project files.");
+  out("Register shortcut: node hook/setup.mjs --register writes Claude Code, Grok, Codex and Cursor project files.");
 }
 
 function readJsonFile(file) {
@@ -109,9 +109,9 @@ function writeJsonFile(file, body) {
   fs.writeFileSync(file, JSON.stringify(body, null, 2) + "\n");
 }
 
-function registerMerged(file, merge, remove) {
+function registerMerged(file, merge, remove, strip = removeClaudeSettings) {
   const existing = readJsonFile(file);
-  const next = remove ? removeClaudeSettings(existing) : merge(existing);
+  const next = remove ? strip(existing) : merge(existing);
   writeJsonFile(file, next);
   return file;
 }
@@ -132,6 +132,8 @@ const REGISTERED_AGENTS = {
     registerDedicated(path.join(project, ".grok", "hooks", "xrpl-devex.json"), grokHooks(), remove),
   codex: (remove) =>
     registerMerged(path.join(project, ".codex", "hooks.json"), mergeCodexSettings, remove),
+  cursor: (remove) =>
+    registerMerged(path.join(project, ".cursor", "hooks.json"), mergeCursorSettings, remove, removeCursorSettings),
 };
 
 const PROJECT_AGENTS = Object.keys(REGISTERED_AGENTS);
@@ -140,7 +142,7 @@ function registerAgent(agent, remove) {
   const names = !agent || agent === "all" ? PROJECT_AGENTS : [agent];
   for (const name of names) {
     if (!REGISTERED_AGENTS[name]) {
-      process.stderr.write(`unknown agent ${name}. Use one of: all, ${PROJECT_AGENTS.join(", ")}. For cursor and vscode-copilot use --emit-hooks and paste the block.\n`);
+      process.stderr.write(`unknown agent ${name}. Use one of: all, ${PROJECT_AGENTS.join(", ")}. For vscode-copilot use --emit-hooks and paste the block.\n`);
       process.exit(1);
     }
   }

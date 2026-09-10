@@ -83,6 +83,7 @@ test("hackathon e2e: consent, Grok/Claude/Codex commands, local buffer, no inges
     assert.equal(fs.existsSync(path.join(dir, ".grok", "hooks", "xrpl-devex.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".codex", "hooks.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".claude", "settings.json")), true);
+    assert.equal(fs.existsSync(path.join(dir, ".cursor", "hooks.json")), true);
     assert.equal(fs.existsSync(path.join(dir, ".grok", "skills", "xrpl-status", "SKILL.md")), true);
     assert.match(fs.readFileSync(path.join(dir, ".gitignore"), "utf8"), /\.xrpl-devex\//);
 
@@ -144,6 +145,25 @@ test("hackathon e2e: consent, Grok/Claude/Codex commands, local buffer, no inges
       toolInput: { command: "npm install xrpl" },
     });
     assert.equal(install.status, 0, install.stderr);
+
+    const cursorHooksFile = readJson(path.join(dir, ".cursor", "hooks.json"));
+    const cursorShell = cursorHooksFile.hooks.afterShellExecution[0].command;
+    const cursor = runShellHook(cursorShell, dir, {
+      hook_event_name: "afterShellExecution",
+      conversation_id: "hack-1",
+      workspace_roots: [dir],
+      command: "node vault.js",
+      output: "VaultDeposit tecNO_PERMISSION",
+    });
+    assert.equal(cursor.status, 0, cursor.stderr);
+
+    const cursorPrompt = runShellHook(cursorHooksFile.hooks.beforeSubmitPrompt[0].command, dir, {
+      hook_event_name: "beforeSubmitPrompt",
+      conversation_id: "hack-1",
+      workspace_roots: [dir],
+      prompt: "how do I call VaultWithdraw on xls-65",
+    });
+    assert.equal(cursorPrompt.status, 0, cursorPrompt.stderr);
 
     const claudeSettings = readJson(path.join(dir, ".claude", "settings.json"));
     const claudePost = claudeSettings.hooks.PostToolUse[0].hooks[0];
@@ -237,7 +257,7 @@ test("hackathon e2e: consent, Grok/Claude/Codex commands, local buffer, no inges
     assert.equal(leaked.includes("supersecret"), false);
     assert.equal(leaked.includes("faketoken123456"), false);
     assert.match(leaked, /\[redacted:/);
-    assert.equal(events.filter((e) => e.kind === "prompt").length, 1);
+    assert.ok(events.filter((e) => e.kind === "prompt").length >= 2);
     assert.equal(sent(dir).length, 0);
 
     const status = spawnSync(process.execPath, [STATUS, "--project", dir], { encoding: "utf8", env: hookEnv(dir) });

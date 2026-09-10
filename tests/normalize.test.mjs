@@ -17,6 +17,7 @@ test("canonicalToolName maps Grok and Codex tools onto Claude names", () => {
   assert.equal(canonicalToolName("web_search"), "WebSearch");
   assert.equal(canonicalToolName("apply_patch"), "Edit");
   assert.equal(canonicalToolName("Bash"), "Bash");
+  assert.equal(canonicalToolName("Shell"), "Bash");
   assert.equal(canonicalToolName("Write"), "Write");
 });
 
@@ -107,4 +108,43 @@ test("apply_patch command is treated as an Edit of the first file", () => {
 test("Cursor conversation_id becomes session_id", () => {
   const n = normalizeHookInput({ conversation_id: "cursor-1" });
   assert.equal(n.session_id, "cursor-1");
+});
+
+test("Cursor beforeSubmitPrompt maps to UserPromptSubmit", () => {
+  const n = normalizeHookInput({
+    hook_event_name: "beforeSubmitPrompt",
+    conversation_id: "c1",
+    workspace_roots: ["/tmp/proj"],
+    prompt: "VaultDeposit tecNO_PERMISSION",
+  });
+  assert.equal(n.hook_event_name, "UserPromptSubmit");
+  assert.equal(n.session_id, "c1");
+  assert.equal(n.cwd, "/tmp/proj");
+  assert.equal(n.prompt, "VaultDeposit tecNO_PERMISSION");
+  assert.equal(n.tool_name, undefined);
+});
+
+test("Cursor afterShellExecution becomes a Bash PostToolUse", () => {
+  const n = normalizeHookInput({
+    hook_event_name: "afterShellExecution",
+    conversation_id: "c1",
+    cwd: "/tmp/proj",
+    command: "node vault.js",
+    output: "VaultDeposit failed tecNO_PERMISSION",
+  });
+  assert.equal(n.hook_event_name, "PostToolUse");
+  assert.equal(n.tool_name, "Bash");
+  assert.equal(n.tool_input.command, "node vault.js");
+  assert.equal(n.tool_response.stdout, "VaultDeposit failed tecNO_PERMISSION");
+});
+
+test("Cursor afterFileEdit becomes an Edit PostToolUse", () => {
+  const n = normalizeHookInput({
+    hook_event_name: "afterFileEdit",
+    file_path: "/tmp/vault-deposit.js",
+    edits: [{ old_string: "a", new_string: "VaultCreate()" }],
+  });
+  assert.equal(n.tool_name, "Edit");
+  assert.equal(n.tool_input.file_path, "/tmp/vault-deposit.js");
+  assert.equal(n.tool_input.new_string, "VaultCreate()");
 });
