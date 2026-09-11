@@ -25,6 +25,10 @@ Only when the text has an XRPL allowlist hit (`hook/xrpl-allowlist.json`: transa
 - `/xrpl-feedback` text, verbatim, up to 2000 characters, with its classification
 - `/xrpl-session-analysis` report and JSON block, after the participant confirms
 
+## Language
+
+Everything the agent writes (reflections, `/xrpl-feedback` items, session analyses) is stored in English; when the developer wrote in another language the skill translates and keeps the original in the event payload. Prompts recorded by the passive hooks stay in the language they were typed in: no model is involved at capture time.
+
 ## Invite code
 
 Some events are invite only. The code the organizer hands out is stored in the same local file as the pseudonym and sent with every write. It identifies the event, not the person: every participant of the event shares it, and it is never written to the repo.

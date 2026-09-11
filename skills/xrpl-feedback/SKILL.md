@@ -36,15 +36,17 @@ friction_type (what kind of friction):
 
 feature: a short lowercase hyphenated tag or `null`: `xls-65` (single asset vault), `xls-66` (lending, loan broker), `mpt`, `amm`, `payment-channels`, `credentials`, `permissioned-domains`, `nft`, `escrow`, `checks`, `dex`, `trust-lines`, `rlusd`, `mpp`, `x402`, `starter-kit`. Check `hook/devex.config.json` `focus_features` for this event's focus, but tag what the text is actually about.
 
-tx_type: canonical XRPL transaction type when identifiable (`VaultDeposit`, `LoanSet`, `Payment`) or `null`. result_code: canonical code (`tecNO_PERMISSION`) or `null`. summary: one line in the developer's own words, lightly cleaned, under 200 characters. text: the developer's words verbatim, at most 2000 characters.
+tx_type: canonical XRPL transaction type when identifiable (`VaultDeposit`, `LoanSet`, `Payment`) or `null`. result_code: canonical code (`tecNO_PERMISSION`) or `null`. summary: one line, in English, in the developer's own words lightly cleaned, under 200 characters. text: the developer's words, in English, at most 2000 characters. Everything stored is English: when the developer wrote in another language, translate faithfully into `text` and `summary`, and keep the original in `payload.original_text`.
 
 ## 2. Write it through submit.mjs
 
 Never hand-write the buffer file. Find the repo (`./hook/submit.mjs`, else `find . -path '*/hook/submit.mjs' -not -path '*/node_modules/*' | head -1`) and run:
 
 ```
-node <repo>/hook/submit.mjs --local --channel feedback --session "${CLAUDE_SESSION_ID}" --json '{"surface":"...","friction_type":"...","feature":null,"tx_type":null,"result_code":null,"summary":"...","text":"..."}'
+node <repo>/hook/submit.mjs --local --channel feedback --session "${CLAUDE_SESSION_ID}" --json '{"surface":"...","friction_type":"...","feature":null,"tx_type":null,"result_code":null,"summary":"...","text":"...","payload":{"original_text":"<only when translated>"}}'
 ```
+
+Omit `payload` when the developer already wrote in English.
 
 If the text contains single quotes, pipe it instead: `printf '%s' '<json>' | node <repo>/hook/submit.mjs --local --channel feedback --session "${CLAUDE_SESSION_ID}" --json -`
 
@@ -76,3 +78,6 @@ Input: "I had to write my own retry around tefPAST_SEQ because the SDK does not 
 
 Input: "the tutorial calls it redeem but the tx is VaultWithdraw"
 -> surface `docs`, friction_type `terminology`, feature `xls-65`, tx_type `VaultWithdraw`.
+
+Input: "la page VaultDeposit ne dit pas qui a le droit de déposer dans un vault privé"
+-> surface `docs`, friction_type `doc_gap`, feature `xls-65`, tx_type `VaultDeposit`, text "The VaultDeposit page does not say who is allowed to deposit into a private vault", payload `{"original_text":"la page VaultDeposit ne dit pas qui a le droit de déposer dans un vault privé"}`. Reply: `Logged as [docs / doc_gap]. Back to it.`

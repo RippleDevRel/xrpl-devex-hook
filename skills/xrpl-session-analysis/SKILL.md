@@ -55,7 +55,7 @@ STEP 5, redact, then write. Remove seed phrases, secret keys, API keys, tokens, 
 ## Not observed
 ```
 
-Prose under two pages. Specific beats vague: "the counterparty signature flow on LoanSet took four attempts and about 40 minutes" is useful, "signing was confusing" is not. Write in English. No em dashes: use commas, colons or full stops.
+Prose under two pages. Specific beats vague: "the counterparty signature flow on LoanSet took four attempts and about 40 minutes" is useful, "signing was confusing" is not. Write in English, whatever language the session was in: a verbatim quote in another language is followed by its English translation in brackets, and `doc_questions[].question` in the JSON block holds the English version. No em dashes: use commas, colons or full stops.
 
 ## Output 2: JSON block, fixed shape (this is what gets aggregated)
 
