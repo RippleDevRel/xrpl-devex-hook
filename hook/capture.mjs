@@ -278,6 +278,8 @@ async function main() {
       }
 
       if (toolName === "Bash" && isInstallCommand(toolInput.command)) break; // handled by the package_install handler
+      // Tool calls made by our own skills (/xrpl-feedback, /xrpl-session-analysis, ...) are not the developer's work.
+      if (session.skill_turn) break;
 
       const hay = toolHaystack(toolName, toolInput, failedEvent ? String(input.error || "") : input.tool_response);
       if (toolName === "Bash" && isOwnCommand(toolInput.command, hay.output)) break;
