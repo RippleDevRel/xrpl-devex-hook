@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { dataPaths, ensureDataDir } from "./paths.mjs";
-import { participantPayload } from "./identity.mjs";
+import { participantPayload, writeHeaders, isInviteReject } from "./identity.mjs";
 import { postJson } from "./net.mjs";
 import { debug } from "./log.mjs";
 
@@ -100,11 +100,17 @@ export async function flushBuffer({ config, identity, hint, timeoutMs }) {
   let status = 0;
   for (let i = 0; i < events.length; i += MAX_EVENTS_PER_CALL) {
     const chunk = events.slice(i, i + MAX_EVENTS_PER_CALL);
-    const res = await postJson(url, { participant, events: chunk }, { headers: { "x-ingest-key": config.ingest_key }, timeoutMs: to });
+    const res = await postJson(url, { participant, events: chunk }, { headers: writeHeaders(identity, config), timeoutMs: to });
     status = res.status;
     if (!res.ok) {
       error = res.error + (res.body && res.body.error ? `: ${res.body.error}` : "");
       debug(hint, "flush failed", error, res.body);
+      // A missing or rotated invite code is fixed by running the setup again:
+      // keep everything buffered.
+      if (isInviteReject(res)) {
+        prependToBuffer(p, events.slice(i));
+        break;
+      }
       // Permanent rejections (bad payload, banned) must not clog the buffer
       // forever: park them in rejected.jsonl and move on.
       if (res.status === 400 || res.status === 403) {
@@ -127,7 +133,7 @@ export async function flushBuffer({ config, identity, hint, timeoutMs }) {
 
 // Pending analyses saved by submit.mjs after a network failure. Each file holds
 // the exact body for POST /analysis. Returns { sent, remaining, error }.
-export async function flushPendingAnalyses({ config, hint, timeoutMs }) {
+export async function flushPendingAnalyses({ config, identity, hint, timeoutMs }) {
   const p = dataPaths(hint);
   if (!fs.existsSync(p.pendingAnalyses)) return { sent: 0, remaining: 0, error: null };
   const files = fs.readdirSync(p.pendingAnalyses).filter((f) => f.endsWith(".json")).sort();
@@ -143,11 +149,14 @@ export async function flushPendingAnalyses({ config, hint, timeoutMs }) {
       fs.renameSync(full, full + ".corrupt");
       continue;
     }
-    const res = await postJson(config.endpoint + "/analysis", body, { headers: { "x-ingest-key": config.ingest_key }, timeoutMs: to });
+    const res = await postJson(config.endpoint + "/analysis", body, { headers: writeHeaders(identity, config), timeoutMs: to });
     if (res.ok) {
       fs.unlinkSync(full);
       appendAnalysesLog(hint, { at: new Date().toISOString(), id: (res.body && res.body.id) || null, status: "sent_from_pending", file: f });
       sent += 1;
+    } else if (isInviteReject(res)) {
+      error = res.error + ": " + res.body.error;
+      break;
     } else if (res.status === 400 || res.status === 403) {
       fs.renameSync(full, full + ".rejected");
       error = res.error;

@@ -12,15 +12,17 @@ Do this first, in order. Every step is project scoped: write only inside the pro
 
 2. Read `REPO/INSTALL.md` in full.
 
-3. Show the consent text to the developer, verbatim, and ask two things in one message: do you consent (yes or no), and what is your team name. Get the text with:
+3. Check whether the event requires an invite code, then show the consent text verbatim:
    ```bash
+   node REPO/hook/setup.mjs --check-invite      # {"invite_only": true} means the organizer handed out a code
    node REPO/hook/setup.mjs --show-consent
    ```
-   Do not continue until they answer. Do not guess the team name. Never ask for a real name or an email: none is collected, the developer gets a random pseudonym.
+   Ask everything in one message: do you consent (yes or no), what is your team name, and, when invite_only is true, the event invite code. Do not continue until they answer. Do not guess the team name or the code. Never ask for a real name or an email: none is collected, the developer gets a random pseudonym.
 
 4. Record the answer, naming the agent you are running as (`claude-code`, `cursor`, `codex`, `grok` or `vscode-copilot`). This writes that agent's project-local hooks (absolute paths, kept out of git) and installs the skills. Never write into a home directory config.
    ```bash
    TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive --agent <your agent>
+   # invite-only event: add INVITE_CODE="<the code they typed>" in front. The setup verifies it and refuses a wrong one.
    ```
    or, if they decline, `CONSENT=no node REPO/hook/setup.mjs --non-interactive`, then stop here and build. If you are none of those agents, run without `--agent` and follow "Any other agent" in `REPO/INSTALL.md`.
 

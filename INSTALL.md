@@ -52,6 +52,10 @@ TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive
 
 Optional: `--project /path/to/project` when running from elsewhere.
 
+### Invite code
+
+Some events are invite only: the Worker then refuses writes without the code the organizer handed out. `node REPO/hook/setup.mjs --check-invite` prints `{ "invite_only": true }` when that is the case. Pass the code at consent time (`--invite-code <code>` or `INVITE_CODE=<code>`), or later with `node REPO/hook/setup.mjs --invite <code>` (`/xrpl-setup invite <code>` in your agent). The setup verifies it against the server and stores it in the local, gitignored `.xrpl-devex/identity.json`; every write then carries it as `X-Invite-Code`. If the organizer rotates the code, `/xrpl-status` says the last flush was refused, events stay buffered, and the new code drains them.
+
 ## Step 2: register the hooks (project scoped, never global)
 
 Consent (`--non-interactive` or the interactive prompt) registers the agent it detects from the environment (Claude Code, Cursor, Codex, Grok Build or GitHub Copilot) and installs the skills. Name the agent explicitly when running from a plain shell or another agent:
@@ -168,7 +172,7 @@ In your agent, type `/xrpl-status`, then `/xrpl-feedback the devnet faucet is sl
 | `prompt_max_chars` | 2000 | stored prompt length |
 | `output_max_chars` | 1500 | stored tool output length |
 
-Environment overrides: `XRPL_DEVEX_CONFIG` (path to another config file), `XRPL_DEVEX_ENDPOINT`, `XRPL_DEVEX_INGEST_KEY`, `XRPL_DEVEX_EVENT`, `XRPL_DEVEX_REFLECTION_SAMPLE` (set to `0` to pause the reflection, `1` for every turn), `XRPL_DEVEX_PROJECT_DIR` (where `.xrpl-devex/` lives), `XRPL_DEVEX_DEBUG=1` (writes diagnostics to `.xrpl-devex/debug.log`).
+Environment overrides: `INVITE_CODE` (event invite code at consent time), `XRPL_DEVEX_CONFIG` (path to another config file), `XRPL_DEVEX_ENDPOINT`, `XRPL_DEVEX_INGEST_KEY`, `XRPL_DEVEX_EVENT`, `XRPL_DEVEX_REFLECTION_SAMPLE` (set to `0` to pause the reflection, `1` for every turn), `XRPL_DEVEX_PROJECT_DIR` (where `.xrpl-devex/` lives), `XRPL_DEVEX_DEBUG=1` (writes diagnostics to `.xrpl-devex/debug.log`).
 
 If the organizer has not filled in `endpoint` and `ingest_key` yet, everything still buffers locally and flushes once they do.
 
@@ -189,7 +193,7 @@ Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` d
 ## Troubleshooting
 
 - `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register <agent>` and check `/hooks`. Grok also needs `/hooks-trust`.
-- Nothing ever gets sent, buffer keeps growing: `endpoint` or `ingest_key` still say `REPLACE-ME`, or the Worker is unreachable. Run `node REPO/hook/submit.mjs --retry-pending` to see the error.
+- Nothing ever gets sent, buffer keeps growing: `endpoint` or `ingest_key` still say `REPLACE-ME`, the Worker is unreachable, or the event requires an invite code you have not stored (`/xrpl-status` says so). Run `node REPO/hook/submit.mjs --retry-pending` to see the error, `node REPO/hook/setup.mjs --invite <code>` to fix the code.
 - Claude continues after a turn with an "XRPL developer experience check": that is the reflection hook doing its job. Set `XRPL_DEVEX_REFLECTION_SAMPLE=0` to reduce it to error-triggered turns only, or `/xrpl-setup disable` to remove all hooks.
 - Cursor loops: make sure `loop_limit` is set in `.cursor/hooks.json`.
 - Exit 127 in the hook log: a relative path; re-run `--register` or `--emit-hooks` so the paths are absolute.

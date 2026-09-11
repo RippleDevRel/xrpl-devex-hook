@@ -16,11 +16,15 @@
 // Claude Code hooks go to .claude/settings.local.json (ignored by convention) and
 // the dedicated Grok and Copilot files are added to the project .gitignore.
 //   node hook/setup.mjs --show-consent
+//   node hook/setup.mjs --check-invite           prints { reachable, invite_only } from the Worker's /health
+//   INVITE_CODE=... node hook/setup.mjs --non-interactive ...   or --invite-code <code>: verified and stored locally
+//   node hook/setup.mjs --invite <code>          set or replace the invite code after setup
 //   node hook/setup.mjs --project /path/to/project   (default: CLAUDE_PROJECT_DIR or cwd)
 //
 // Writes .xrpl-devex/identity.json: { participant_id, team, team_display,
-// consented_at, client_version } or { declined: true }. No real name, ever.
-// Also appends .xrpl-devex/ to the project's .gitignore.
+// consented_at, client_version, invite_code?, invite_only } or { declined: true }.
+// No real name, ever. The invite code is handed out at the event, never in the
+// repo; it stays in this local, gitignored file and is sent as X-Invite-Code.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -30,6 +34,7 @@ import { loadConfig, isConfigured } from "./lib/config.mjs";
 import { consentText } from "./lib/consent.mjs";
 import { projectDir, dataPaths, HOOK_DIR, REPO_DIR, fwd } from "./lib/paths.mjs";
 import { loadIdentity, saveIdentity, createIdentity, declinedIdentity, normalizeTeam, isActive } from "./lib/identity.mjs";
+import { getJson, postJson } from "./lib/net.mjs";
 import { claudeCodeHooks, cursorHooks, grokHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, mergeCodexSettings, mergeCursorSettings, removeClaudeSettings, removeCursorSettings } from "./lib/registrations.mjs";
 
 const argv = process.argv.slice(2);
@@ -129,6 +134,44 @@ function emitHooks({ agent, asJson }) {
   out("Codex alternative  ->  .codex/config.toml");
   out(codexToml());
   out("Register shortcut: node hook/setup.mjs --register <agent> writes the file for that agent with absolute paths (or --register all).");
+}
+
+// Does this event require an invite code? Asks the Worker's public /health.
+async function inviteStatus() {
+  if (!isConfigured(config)) return { reachable: false, invite_only: false, reason: "endpoint not configured" };
+  const r = await getJson(config.endpoint + "/health", { timeoutMs: 5000 });
+  if (!r.ok) return { reachable: false, invite_only: false, reason: r.error };
+  return { reachable: true, invite_only: Boolean(r.body && r.body.invite_only) };
+}
+
+// Checks a code against POST /invite/verify without writing anything.
+async function verifyInvite(code) {
+  const r = await postJson(config.endpoint + "/invite/verify", {}, { headers: { "x-ingest-key": config.ingest_key, "x-invite-code": code }, timeoutMs: 5000 });
+  if (r.ok) return { ok: true };
+  if (r.status === 403) return { ok: false, error: (r.body && r.body.error) || "invite_invalid" };
+  return { ok: false, error: r.error || "network error", network: true };
+}
+
+// Resolves the invite code for a consent: verified when the Worker is reachable.
+// Returns { code, invite_only } or exits with a message the agent can relay.
+async function resolveInvite(existing, provided) {
+  const status = await inviteStatus();
+  const code = String(provided || (existing && existing.invite_code) || "").trim();
+  if (status.invite_only && !code) {
+    process.stderr.write("This event requires an invite code. Ask the developer for the code handed out at the event, then pass it with --invite-code <code> or INVITE_CODE=<code>. Nothing was changed.\n");
+    process.exit(1);
+  }
+  if (code && status.reachable) {
+    const v = await verifyInvite(code);
+    if (!v.ok && !v.network) {
+      process.stderr.write(`The invite code was refused by the server (${v.error}). Check it with the organizer. Nothing was changed.\n`);
+      process.exit(1);
+    }
+    if (!v.ok) out(`Could not verify the invite code now (${v.error}); it is stored and checked at the first flush.`);
+  } else if (code) {
+    out("Invite code stored; it will be checked at the first flush (server not reachable now).");
+  }
+  return { code: code || undefined, invite_only: status.invite_only };
 }
 
 function readJsonFile(file) {
@@ -256,7 +299,7 @@ function finish(identity) {
   out("Disable with: node hook/setup.mjs --unregister");
 }
 
-function nonInteractive() {
+async function nonInteractive() {
   const consent = String(process.env.CONSENT || "").trim().toLowerCase();
   const existing = loadIdentity();
   if (["no", "n", "false", "0", "decline", "declined"].includes(consent)) {
@@ -275,8 +318,29 @@ function nonInteractive() {
   }
   const identity = createIdentity({ teamDisplay, pseudonym: isActive(existing) ? existing.participant_id : undefined });
   if (isActive(existing)) identity.consented_at = existing.consented_at;
+  const invite = await resolveInvite(existing, val("--invite-code") || process.env.INVITE_CODE);
+  if (invite.code) identity.invite_code = invite.code;
+  identity.invite_only = invite.invite_only;
   saveIdentity(identity);
   finish(identity);
+}
+
+// Sets or replaces the invite code on an existing identity.
+async function setInvite(code) {
+  const existing = loadIdentity();
+  if (!isActive(existing)) {
+    process.stderr.write("No active identity. Run the setup (consent) first.\n");
+    process.exit(1);
+  }
+  const invite = await resolveInvite(null, code);
+  if (!invite.code) {
+    process.stderr.write("usage: node hook/setup.mjs --invite <code>\n");
+    process.exit(1);
+  }
+  existing.invite_code = invite.code;
+  existing.invite_only = invite.invite_only;
+  saveIdentity(existing);
+  out("Invite code stored. Buffered events are sent at the next flush (or run: node hook/submit.mjs --retry-pending).");
 }
 
 async function interactive() {
@@ -303,15 +367,46 @@ async function interactive() {
     const def = existing && existing.team_display ? ` [${existing.team_display}]` : "";
     teamDisplay = (await ask(`Team name${def}: `)).trim() || (existing && existing.team_display) || "";
   }
+  const status = await inviteStatus();
+  let code = (existing && existing.invite_code) || "";
+  if (status.invite_only) {
+    out("");
+    out("This event requires an invite code, handed out by the organizer.");
+    for (let tries = 0; tries < 3; tries++) {
+      const typed = (await ask(`Invite code${code ? ` [${code}]` : ""}: `)).trim() || code;
+      if (!typed) continue;
+      const v = await verifyInvite(typed);
+      if (v.ok || v.network) {
+        code = typed;
+        if (v.network) out(`Could not verify now (${v.error}); stored and checked at the first flush.`);
+        break;
+      }
+      out(`Refused by the server (${v.error}). Try again.`);
+      if (tries === 2) {
+        rl.close();
+        process.stderr.write("No valid invite code. Nothing was changed.\n");
+        process.exit(1);
+      }
+    }
+  }
   rl.close();
   const identity = createIdentity({ teamDisplay, pseudonym: isActive(existing) ? existing.participant_id : undefined });
   if (isActive(existing)) identity.consented_at = existing.consented_at;
+  if (code) identity.invite_code = code;
+  identity.invite_only = status.invite_only;
   saveIdentity(identity);
   finish(identity);
 }
 
 if (has("--show-consent")) {
   out(consentText(config));
+} else if (has("--check-invite")) {
+  inviteStatus().then((s) => out(JSON.stringify({ endpoint: isConfigured(config) ? config.endpoint : null, ...s })));
+} else if (has("--invite")) {
+  setInvite(val("--invite")).catch((err) => {
+    process.stderr.write(String((err && err.message) || err) + "\n");
+    process.exit(1);
+  });
 } else if (has("--emit-hooks")) {
   emitHooks({ agent: val("--agent"), asJson: has("--json") });
 } else if (has("--unregister")) {
@@ -326,7 +421,10 @@ if (has("--show-consent")) {
   registerAgents(names, false);
   installSkills();
 } else if (has("--non-interactive")) {
-  nonInteractive();
+  nonInteractive().catch((err) => {
+    process.stderr.write(String((err && err.message) || err) + "\n");
+    process.exit(1);
+  });
 } else if (!process.stdin.isTTY) {
   process.stderr.write("No TTY. Use --non-interactive with TEAM_NAME and CONSENT=yes|no after showing the consent text (--show-consent).\n");
   process.exit(1);

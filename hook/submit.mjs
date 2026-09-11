@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { loadConfig, isConfigured } from "./lib/config.mjs";
-import { loadIdentity, isActive, participantPayload } from "./lib/identity.mjs";
+import { loadIdentity, isActive, participantPayload, writeHeaders, isInviteReject } from "./lib/identity.mjs";
 import { makeEvent, redactEvent } from "./lib/events.mjs";
 import { validateEvent, validateAnalysis, FEATURE_RE } from "./lib/taxonomy.mjs";
 import { appendEvents, appendAnalysesLog } from "./lib/buffer.mjs";
@@ -159,11 +159,17 @@ async function submitEvent() {
     process.exit(0);
   }
 
-  const res = await postJson(config.endpoint + "/ingest", { participant: participantPayload(identity, config), events: [ev] }, { headers: { "x-ingest-key": config.ingest_key }, timeoutMs: Math.max(1000, config.flush_timeout_seconds * 1000) });
+  const res = await postJson(config.endpoint + "/ingest", { participant: participantPayload(identity, config), events: [ev] }, { headers: writeHeaders(identity, config), timeoutMs: Math.max(1000, config.flush_timeout_seconds * 1000) });
   if (res.ok) {
     fs.appendFileSync(ensureDataDir().sent, JSON.stringify(ev) + "\n");
     countReflection();
     say(`submitted: ${label}`);
+    process.exit(0);
+  }
+  if (isInviteReject(res)) {
+    appendEvents([ev]);
+    countReflection();
+    say(`buffered: ${label} (this event requires a valid invite code; run node hook/setup.mjs --invite <code> or /xrpl-setup invite <code>, the buffer is sent afterwards)`);
     process.exit(0);
   }
   if (res.status === 400 || res.status === 403) {
@@ -227,19 +233,20 @@ async function submitAnalysis() {
     process.exit(0);
   }
 
-  const res = await postJson(config.endpoint + "/analysis", body, { headers: { "x-ingest-key": config.ingest_key }, timeoutMs: Math.max(3000, config.flush_timeout_seconds * 2000) });
+  const res = await postJson(config.endpoint + "/analysis", body, { headers: writeHeaders(identity, config), timeoutMs: Math.max(3000, config.flush_timeout_seconds * 2000) });
   if (res.ok) {
     markSubmitted("sent");
     say(`submitted analysis ${id} (${res.body && res.body.exploded !== undefined ? res.body.exploded + " friction rows" : "ok"})`);
     process.exit(0);
   }
-  if (res.status === 400 || res.status === 403) fail(`server rejected the analysis (${res.status}): ${JSON.stringify(res.body)}`);
+  if (!isInviteReject(res) && (res.status === 400 || res.status === 403)) fail(`server rejected the analysis (${res.status}): ${JSON.stringify(res.body)}`);
   const p = ensureDataDir();
   fs.mkdirSync(p.pendingAnalyses, { recursive: true });
   const file = path.join(p.pendingAnalyses, `${Date.now()}-${id}.json`);
   fs.writeFileSync(file, JSON.stringify(body));
   markSubmitted("pending");
-  say(`network error (${res.error}). Saved to ${file}; it is retried at the next flush, or run: node hook/submit.mjs --retry-pending`);
+  if (isInviteReject(res)) say(`this event requires a valid invite code (${res.body.error}). Saved to ${file}; run node hook/setup.mjs --invite <code> (or /xrpl-setup invite <code>), then node hook/submit.mjs --retry-pending`);
+  else say(`network error (${res.error}). Saved to ${file}; it is retried at the next flush, or run: node hook/submit.mjs --retry-pending`);
   process.exit(0);
 }
 
@@ -250,7 +257,7 @@ async function retryPending() {
   const config = loadConfig();
   if (!isConfigured(config)) fail("endpoint not configured in hook/devex.config.json");
   const b = await flushBuffer({ config, identity });
-  const a = await flushPendingAnalyses({ config });
+  const a = await flushPendingAnalyses({ config, identity });
   say(`buffer: sent ${b.sent}, remaining ${b.remaining}${b.error ? ", error " + b.error : ""}`);
   say(`pending analyses: sent ${a.sent}, remaining ${a.remaining}${a.error ? ", error " + a.error : ""}`);
   process.exit(b.ok && !a.error ? 0 : 3);

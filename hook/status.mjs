@@ -75,6 +75,7 @@ const status = {
   focus_features: config.focus_features,
   endpoint_configured: isConfigured(config),
   identity: identity ? (identity.declined ? { declined: true } : { participant_id: identity.participant_id, team: identity.team, team_display: identity.team_display, consented_at: identity.consented_at }) : null,
+  invite: identity && !identity.declined ? { required: identity.invite_only === true, stored: Boolean(identity.invite_code) } : null,
   hooks_registered: hooks.registered === true,
   reflection_hook_registered: hooks.reflection === true,
   settings_file: hooks.file,
@@ -114,6 +115,11 @@ else if (identity.declined) lines.push("Identity:       declined. Nothing is cap
 else lines.push(`Participant:    ${identity.participant_id}   Team: ${identity.team_display || identity.team} (${identity.team})`);
 lines.push(`Event:          ${config.event}${config.focus_features.length ? "   focus: " + config.focus_features.join(", ") : ""}`);
 lines.push(`Endpoint:       ${isConfigured(config) ? config.endpoint : "not configured (REPLACE-ME in " + configPath() + "), events stay local"}`);
+if (status.invite) {
+  if (status.invite.required && !status.invite.stored) lines.push("Invite code:    REQUIRED and missing. Run /xrpl-setup invite <code> (or node hook/setup.mjs --invite <code>); events stay buffered until then.");
+  else if (status.invite.stored) lines.push(`Invite code:    stored${status.invite.required ? " (required by this event)" : ""}`);
+}
+if (state.last_flush_result && /invite_(required|invalid)/.test(state.last_flush_result)) lines.push("Invite code:    the last flush was refused (" + state.last_flush_result.replace(/^failed: /, "") + "). Ask the organizer for the current code and run /xrpl-setup invite <code>.");
 lines.push(`Hooks:          ${hooks.registered ? "registered in " + hooks.file : "NOT registered (" + (hooks.reason || "capture.mjs not found in " + hooks.file) + ")"}`);
 lines.push(`Reflection:     ${hooks.reflection ? "registered" : "not registered"}`);
 lines.push(`Buffered:       ${buffered.length} event(s)${buffered.length ? " " + JSON.stringify(status.buffered_by_kind) : ""}`);

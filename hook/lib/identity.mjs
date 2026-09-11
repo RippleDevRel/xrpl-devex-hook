@@ -81,6 +81,20 @@ export function isActive(identity) {
   return Boolean(identity && !identity.declined && identity.participant_id && identity.team);
 }
 
+// Headers for every write to the Worker: the ingest key, plus the event invite
+// code when the participant stored one at setup (INVITE_ONLY events).
+export function writeHeaders(identity, config) {
+  const h = { "x-ingest-key": config.ingest_key };
+  if (identity && typeof identity.invite_code === "string" && identity.invite_code) h["x-invite-code"] = identity.invite_code;
+  return h;
+}
+
+// A 403 that a new invite code would fix. Events must stay buffered, not be
+// parked as rejected.
+export function isInviteReject(res) {
+  return Boolean(res && res.status === 403 && res.body && ["invite_required", "invite_invalid"].includes(res.body.error));
+}
+
 // The participant object sent with every ingest call.
 export function participantPayload(identity, config) {
   return {

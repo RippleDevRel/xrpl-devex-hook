@@ -306,7 +306,7 @@ async function main() {
         debug(hint, "stop flush", r);
       }
       if (isConfigured(config) && fs.existsSync(p.pendingAnalyses) && fs.readdirSync(p.pendingAnalyses).some((f) => f.endsWith(".json"))) {
-        const r = await flushPendingAnalyses({ config, hint });
+        const r = await flushPendingAnalyses({ config, identity, hint });
         debug(hint, "stop pending analyses", r);
       }
       const minutes = ageSeconds(session.session_started_at) / 60;
@@ -340,7 +340,7 @@ async function main() {
         const r = await flushBuffer({ config, identity, hint, timeoutMs: budgetMs });
         state.last_flush_at = nowIso;
         state.last_flush_result = r.ok ? `ok: sent ${r.sent}` : `failed: ${r.error}`;
-        const pa = await flushPendingAnalyses({ config, hint, timeoutMs: budgetMs });
+        const pa = await flushPendingAnalyses({ config, identity, hint, timeoutMs: budgetMs });
         debug(hint, "session end flush", r, pa);
       }
       break;
