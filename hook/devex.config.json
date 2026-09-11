@@ -16,5 +16,7 @@
   "nudge_after_turns": 40,
   "nudge_after_minutes": 180,
   "prompt_max_chars": 2000,
-  "output_max_chars": 1500
+  "output_max_chars": 1500,
+  "analysis_checkpoint_hours": 2,
+  "analysis_checkpoint_min_events": 5
 }

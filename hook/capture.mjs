@@ -22,6 +22,7 @@ import { makeEvent, redactEvent, truncate } from "./lib/events.mjs";
 import { loadAllowlist, compileAllowlist, matchText, parseInstallCommand } from "./lib/matcher.mjs";
 import { dataPaths, fwd } from "./lib/paths.mjs";
 import { debug } from "./lib/log.mjs";
+import { buildCheckpointInstruction } from "./checkpoint.mjs";
 import { normalizeHookInput } from "./lib/normalize.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -386,15 +387,36 @@ async function main() {
         debug(hint, "stop pending analyses", r);
       }
       const minutes = ageSeconds(session.session_started_at) / 60;
-      const due = session.turn >= config.nudge_after_turns || minutes >= config.nudge_after_minutes;
-      if (due && !session.nudged && !session.analysis_submitted && input.stop_hook_active !== true) {
-        session.nudged = true;
-        stdoutJson = {
-          hookSpecificOutput: {
-            hookEventName: "Stop",
-            additionalContext: `This XRPL session has run for ${session.turn} turns (${Math.round(minutes)} minutes) without a session analysis. /xrpl-session-analysis captures friction before context is lost. This reminder is shown once per session.`,
-          },
-        };
+      const checkpointHours = Number(config.analysis_checkpoint_hours) || 0;
+      if (checkpointHours > 0) {
+        // Automatic checkpoint: X hours of XRPL activity since the session
+        // start, the last analysis or the last checkpoint prompt, and enough
+        // XRPL events to be worth a report. Never during a continuation or a
+        // turn that ran one of our skills.
+        const periodStart = [session.last_analysis_at, session.checkpoint_prompted_at, session.session_started_at].filter(Boolean).sort().at(-1);
+        const hours = ageSeconds(periodStart) / 3600;
+        const enough = (session.xrpl_events_since_analysis || 0) >= (Number(config.analysis_checkpoint_min_events) || 1);
+        if (hours >= checkpointHours && enough && input.stop_hook_active !== true && !session.skill_turn) {
+          session.checkpoint_prompted_at = nowIso;
+          session.checkpoint_turn = session.turn;
+          stdoutJson = {
+            hookSpecificOutput: {
+              hookEventName: "Stop",
+              additionalContext: buildCheckpointInstruction({ sessionId, periodStart, events: session.xrpl_events_since_analysis, hours: Math.round(hours * 10) / 10, config }),
+            },
+          };
+        }
+      } else {
+        const due = session.turn >= config.nudge_after_turns || minutes >= config.nudge_after_minutes;
+        if (due && !session.nudged && !session.analysis_submitted && input.stop_hook_active !== true) {
+          session.nudged = true;
+          stdoutJson = {
+            hookSpecificOutput: {
+              hookEventName: "Stop",
+              additionalContext: `This XRPL session has run for ${session.turn} turns (${Math.round(minutes)} minutes) without a session analysis. /xrpl-session-analysis captures friction before context is lost. This reminder is shown once per session.`,
+            },
+          };
+        }
       }
       break;
     }
@@ -427,6 +449,9 @@ async function main() {
   }
 
   if (events.length) appendEvents(events.map(redactEvent), hint);
+  if (session && events.length) {
+    session.xrpl_events_since_analysis = (session.xrpl_events_since_analysis || 0) + events.filter((e) => ["prompt", "tool_result", "package_install", "retry_resolved"].includes(e.kind)).length;
+  }
   saveState(state, hint);
   if (stdoutJson) process.stdout.write(JSON.stringify(stdoutJson) + "\n");
   else if (stdoutText) process.stdout.write(stdoutText + "\n");

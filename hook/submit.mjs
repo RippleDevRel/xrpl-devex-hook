@@ -5,7 +5,7 @@
 //   node hook/submit.mjs --channel reflection --json '<event fields>'   validate, POST /ingest (falls back to the buffer on network failure)
 //   node hook/submit.mjs --local --json '<event fields>'                validate, append to .xrpl-devex/buffer.jsonl (used by /xrpl-feedback)
 //   printf '%s' '<json>' | node hook/submit.mjs --channel reflection --json -
-//   node hook/submit.mjs --analysis <report.json> --markdown <report.md> [--session <id>]
+//   node hook/submit.mjs --analysis <report.json> --markdown <report.md> [--session <id>] [--checkpoint]
 //   node hook/submit.mjs --session <id> ...                             attach a session id (Claude Code exposes ${CLAUDE_SESSION_ID} to skills)
 //
 // Event fields accepted from the caller: surface, friction_type, feature,
@@ -201,7 +201,8 @@ async function submitAnalysis() {
   } catch (err) {
     fail("could not read the markdown report: " + err.message);
   }
-  block = { ...block, participant: identity.participant_id, team: identity.team, event: config.event };
+  const checkpoint = has("--checkpoint");
+  block = { ...block, participant: identity.participant_id, team: identity.team, event: config.event, trigger: checkpoint ? "checkpoint" : block.trigger || "manual" };
   if (block.friction) {
     block.friction = block.friction.map((f) => ({ ...f, feature: normalizeFeature(f.feature) }));
   }
@@ -217,9 +218,12 @@ async function submitAnalysis() {
   const body = { participant: participantPayload(identity, config), analysis: { id, ts: new Date().toISOString(), session_id: sessionId, json: block, markdown } };
 
   const markSubmitted = (status) => {
-    appendAnalysesLog(undefined, { at: new Date().toISOString(), id, status, coverage: block.coverage, json: path.resolve(jsonPath), markdown: path.resolve(mdPath) });
+    appendAnalysesLog(undefined, { at: new Date().toISOString(), id, status, trigger: block.trigger, coverage: block.coverage, json: path.resolve(jsonPath), markdown: path.resolve(mdPath) });
     updateState(undefined, sessionId || "default", (state, session) => {
       session.analysis_submitted = true;
+      session.last_analysis_at = new Date().toISOString();
+      session.xrpl_events_since_analysis = 0;
+      if (checkpoint) session.checkpoints_submitted = (session.checkpoints_submitted || 0) + 1;
     });
   };
 

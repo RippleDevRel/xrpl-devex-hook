@@ -25,6 +25,11 @@ export const DEFAULTS = {
   reflection_max_per_session: 8,
   nudge_after_turns: 40,
   nudge_after_minutes: 180,
+  // Automatic checkpoint analyses: every N hours of session with XRPL activity,
+  // the Stop hook asks the agent to run the session analysis on the period and
+  // submit it without review. 0 disables and leaves the manual reminder only.
+  analysis_checkpoint_hours: 2,
+  analysis_checkpoint_min_events: 5,
   prompt_max_chars: 2000,
   output_max_chars: 1500,
   // Which prompts keep their text: "signal" (a transaction type, a result code
@@ -43,6 +48,8 @@ const NUMERIC = [
   "reflection_max_per_session",
   "nudge_after_turns",
   "nudge_after_minutes",
+  "analysis_checkpoint_hours",
+  "analysis_checkpoint_min_events",
   "prompt_max_chars",
   "output_max_chars",
 ];

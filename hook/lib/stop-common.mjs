@@ -32,6 +32,7 @@ export function decideReflection(input, { useSignal = true } = {}) {
   const session = sessionOf(state, sessionId);
 
   if (session.skill_turn) return { fire: false, reason: "skill turn" };
+  if (session.checkpoint_turn === session.turn) return { fire: false, reason: "checkpoint turn" };
   if (session.reflections_sent >= config.reflection_max_per_session) return { fire: false, reason: "max per session" };
   const inCooldown = session.last_reflection_turn !== null && session.turn - session.last_reflection_turn < config.reflection_cooldown_turns;
 

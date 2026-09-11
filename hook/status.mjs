@@ -91,6 +91,9 @@ const status = {
         reflections_sent: session.reflections_sent,
         reflection_prompts: session.reflection_prompts || 0,
         analysis_submitted: session.analysis_submitted,
+        checkpoints_submitted: session.checkpoints_submitted || 0,
+        last_analysis_at: session.last_analysis_at || null,
+        xrpl_events_since_analysis: session.xrpl_events_since_analysis || 0,
         nudged: session.nudged,
         compacted: session.compacted,
       }
@@ -127,7 +130,7 @@ lines.push(`Sent:           ${sent.length} event(s)${sent.length ? " " + JSON.st
 if (session) {
   lines.push(`Session:        ${session.session_id} started ${session.session_started_at}, ${session.turn} turn(s), ${session.reflections_sent} reflection(s) sent, ${session.reflection_prompts || 0} reflection prompt(s)`);
 }
-lines.push(`Analyses:       ${analyses.length} submitted, ${pending} pending`);
+lines.push(`Analyses:       ${analyses.length} submitted (${analyses.filter((a) => a.trigger === "checkpoint").length} automatic checkpoint(s)), ${pending} pending${Number(config.analysis_checkpoint_hours) > 0 ? `, next checkpoint after ${config.analysis_checkpoint_hours} h of XRPL activity` : ""}`);
 lines.push(`Last flush:     ${state.last_flush_at ? state.last_flush_at + " " + state.last_flush_result : "never"}`);
 lines.push(`Note:           ${status.passive_capture_note}`);
 process.stdout.write(lines.join("\n") + "\n");

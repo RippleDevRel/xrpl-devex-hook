@@ -95,6 +95,10 @@ Prose under two pages. Specific beats vague: "the counterparty signature flow on
 
 `time_to_first_success_minutes` is keyed by canonical tx_type with integer or null values; `time_to_first_success_source` uses the same keys with `hook | transcript | reported`. `feature` values are lowercase hyphenated tags (`xls-65`, `xls-66`, `mpt`, `amm`, `rlusd`, `mpp`, `x402`). `attempts` and `minutes_lost` are non-negative integers. Never put `praise` or `unknown` in this block.
 
+## Checkpoint mode
+
+When this procedure is triggered by the Stop hook checkpoint instruction (it says "XRPL DevEx checkpoint" and gives a period start), do everything above with four differences: cover only the period since the given start, skip step 4 entirely (no questions; list what you could not determine under Not observed), add `"trigger": "checkpoint"` and `"period_start": "<ISO>"` to the JSON block, and submit immediately with the `--checkpoint` flag instead of asking. Then tell the developer in one line where the report is, or that nothing in the period was worth reporting, and return to their task. Manual runs of `/xrpl-session-analysis` keep asking before submitting.
+
 ## Save, show, ask once, submit
 
 1. `mkdir -p .xrpl-devex/reports` and write both files with the same timestamp: `.xrpl-devex/reports/session-analysis-<YYYYMMDD-HHMMSS>.md` and `.xrpl-devex/reports/session-analysis-<YYYYMMDD-HHMMSS>.json`.

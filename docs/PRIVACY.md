@@ -24,6 +24,7 @@ Only when the text has an XRPL allowlist hit (`hook/xrpl-allowlist.json`: transa
 - reflection items the agent's model writes (structured JSON plus one paragraph, 50 to 2000 characters)
 - `/xrpl-feedback` text, verbatim, up to 2000 characters, with its classification
 - `/xrpl-session-analysis` report and JSON block, after the participant confirms
+- when the organizer enables checkpoints (`analysis_checkpoint_hours`, default every 2 hours of XRPL activity), an automatic session analysis of the period, written by the agent and submitted after redaction without a review step; the consent text states it and every report stays readable in `.xrpl-devex/reports/`
 
 ## Language
 

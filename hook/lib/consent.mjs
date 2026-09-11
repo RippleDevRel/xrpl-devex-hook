@@ -15,6 +15,9 @@ export function consentText(config) {
     "Nothing without an XRPL keyword is stored. File contents, git history, environment variables, names and emails are never collected, " +
     "and a redaction pass removes seeds, keys and tokens before anything is written. " +
     "You are identified only by a random pseudonym and your team name; in a small cohort that pair may still identify you to the organizer. " +
+    (Number(config.analysis_checkpoint_hours) > 0
+      ? `Every ${Number(config.analysis_checkpoint_hours)} hour(s) of XRPL activity, your agent also writes a session analysis of that period and submits it after redaction; you can read every report in .xrpl-devex/reports/. `
+      : "") +
     `Data is kept for ${days} days and used for developer experience reporting only. ` +
     "You can stop at any time by deleting .xrpl-devex/identity.json in this project or removing the hooks from your agent settings."
   );

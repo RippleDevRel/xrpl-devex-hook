@@ -168,7 +168,9 @@ In your agent, type `/xrpl-status`, then `/xrpl-feedback the devnet faucet is sl
 | `reflection_cooldown_turns` | 3 | minimum turns between two random-fallback reflection prompts; an XRPL error or a strong XRPL mention fires regardless (at most once per turn) |
 | `reflection_max_per_session` | 8 | cap on reflection items per session |
 | `nudge_after_turns` | 40 | one-time reminder to run `/xrpl-session-analysis` |
-| `nudge_after_minutes` | 180 | or after this long |
+| `nudge_after_minutes` | 180 | or after this long (only used when checkpoints are off) |
+| `analysis_checkpoint_hours` | 2 | every N hours of XRPL activity, the Stop hook has the agent run a session analysis of the period and submit it without review (`trigger: checkpoint`); `0` disables and keeps the one-time reminder |
+| `analysis_checkpoint_min_events` | 5 | XRPL hook events needed in the period before a checkpoint fires |
 | `prompt_max_chars` | 2000 | stored prompt length |
 | `prompt_text` | `signal` | which XRPL prompts keep their text: `signal` (names a transaction type or result code, or reads like a question or problem), `always`, `never` (counted, no text) |
 | `output_max_chars` | 1500 | stored tool output length |

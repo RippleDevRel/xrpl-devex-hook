@@ -30,6 +30,12 @@ export function newSession(sessionId, now = new Date()) {
     last_reflection_turn: null,
     recent_tool_results: [],
     compacted: false,
+    // checkpoint analyses
+    xrpl_events_since_analysis: 0,
+    last_analysis_at: null,
+    checkpoint_prompted_at: null,
+    checkpoint_turn: null,
+    checkpoints_submitted: 0,
   };
 }
 
