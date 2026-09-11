@@ -139,10 +139,11 @@ function stripOwn(text) {
   return typeof text === "string" ? text.replace(/\.?xrpl-devex[\w.-]*/gi, " ").replace(/XRPL DevEx Capture/gi, " ") : text;
 }
 
-// SDK exceptions without a result code, as printed when thrown ("Name: message"
-// or "Name(...)" in a Python traceback), not as read in source code
-// ("new errors_1.XRPLFaucetError("). Counts as a failure for the turn.
-const ERROR_CLASS_RE = /(?<![\w.])((?:XRPL|Xrpl|Rippled)\w*(?:Error|Exception)|ValidationError|NotConnectedError|DisconnectedError|ResponseFormatError|XRPLFaucetError)(?::\s|\s*\(|\s+-\s)/;
+// SDK exceptions without a result code, as printed when thrown: "Name: message"
+// in Node, "module.path.Name: message" at the end of a Python traceback. Source
+// code that constructs or catches them ("new errors_1.XRPLFaucetError(") has no
+// colon after the name and does not count. Counts as a failure for the turn.
+const ERROR_CLASS_RE = /\b((?:XRPL|Xrpl|Rippled)\w*(?:Error|Exception)|ValidationError|NotConnectedError|DisconnectedError|ResponseFormatError):\s/;
 function detectErrorClass(output) {
   if (typeof output !== "string") return null;
   const m = output.match(ERROR_CLASS_RE);
