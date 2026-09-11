@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-TARGETS=(".claude/skills" ".cursor/skills" ".codex/skills")
+TARGETS=(".claude/skills" ".cursor/skills" ".codex/skills" ".grok/skills")
 
 IS_WINDOWS=0
 case "$(uname -s 2>/dev/null)" in
@@ -89,7 +89,7 @@ fi
 
 echo ""
 echo "installed $total skill(s) into: ${TARGETS[*]} (project: $PROJECT_ROOT)"
-echo "Cursor also reads .claude/skills and .codex/skills, so it is covered as well."
+echo "Grok also reads .claude/skills; .grok/skills is installed for a dedicated copy."
 if [ "$IS_WINDOWS" -eq 1 ]; then
   echo "Windows detected: skills were copied rather than symlinked. Re-run after pulling changes."
 fi

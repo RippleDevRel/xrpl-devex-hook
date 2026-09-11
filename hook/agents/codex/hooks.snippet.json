@@ -1,17 +1,22 @@
 {
-  "description": "XRPL DevEx Capture reflection Stop hook.",
+  "_comment": "Reference only. Prefer `node hook/setup.mjs --register codex`, which writes this with absolute paths into .codex/hooks.json. Codex command hooks are a single string. Trust project hooks in /hooks before they run. SessionEnd timeout must stay at 3 seconds.",
+  "description": "XRPL DevEx Capture: passive capture and reflection.",
   "hooks": {
+    "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event SessionStart", "timeout": 10 }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event UserPromptSubmit", "timeout": 10 }] }],
+    "PostToolUse": [
+      { "matcher": "Bash|apply_patch|Write|Edit", "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse", "timeout": 10 }] },
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse --package-install", "timeout": 10 }] }
+    ],
     "Stop": [
       {
-        "matcher": "",
         "hooks": [
-          {
-            "type": "command",
-            "command": "node /ABSOLUTE/PATH/TO/hook/agents/codex/stop-hook.mjs",
-            "timeout": 60
-          }
+          { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event Stop", "timeout": 20 },
+          { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/stop-hook.mjs\"", "timeout": 60 }
         ]
       }
-    ]
+    ],
+    "PreCompact": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PreCompact", "timeout": 10 }] }],
+    "SessionEnd": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event SessionEnd", "timeout": 3 }] }]
   }
 }

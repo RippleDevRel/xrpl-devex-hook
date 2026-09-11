@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// VS Code (Copilot) Stop hook, reflection channel. Mirrors Claude Code's
-// mechanics (JSON on stdin, exit 2 + stderr) but VS Code does not document
-// stop_hook_active or a block cap, so on top of that check a short per-session
-// cooldown file guards against loops. Gate: random sample only. Loop guards
-// kept verbatim from the SingHacks repo.
+// GitHub Copilot Stop hook (VS Code agent hooks and Copilot CLI agentStop).
+// Both continue the agent through a JSON decision on stdout, not through exit
+// code 2 (which VS Code shows as an error and the CLI treats as a warning):
+//   { "decision": "block", "reason": "<instruction>" } plus the same inside
+//   hookSpecificOutput for the VS Code schema. stop_hook_active is documented
+// on both; a short cooldown file remains as a second loop guard. Gate is
+// signal-first once passive capture fills the per-turn error counter.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -39,10 +41,13 @@ try {
   } catch {
     // if the guard cannot write, fall through and still inject once
   }
-  const d = decideReflection(input, { useSignal: false });
+  const d = decideReflection(input, { useSignal: true });
   if (!d.fire) exitAllow();
-  process.stderr.write(buildInstruction({ submitPath, sessionId: d.sessionId, signal: d.signal, config: d.config }) + "\n");
-  process.exit(2);
+  const reason = buildInstruction({ submitPath, sessionId: d.sessionId, signal: d.signal, config: d.config });
+  // Synchronous write: a pipe on stdout is asynchronous in Node and exit()
+  // right after process.stdout.write truncates anything past the pipe buffer.
+  fs.writeSync(1, JSON.stringify({ decision: "block", reason, hookSpecificOutput: { hookEventName: "Stop", decision: "block", reason } }) + "\n");
+  process.exit(0);
 } catch {
   exitAllow();
 }

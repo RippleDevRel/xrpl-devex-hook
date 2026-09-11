@@ -22,6 +22,7 @@ import { makeEvent, redactEvent, truncate } from "./lib/events.mjs";
 import { loadAllowlist, compileAllowlist, matchText, parseInstallCommand } from "./lib/matcher.mjs";
 import { dataPaths, fwd } from "./lib/paths.mjs";
 import { debug } from "./lib/log.mjs";
+import { normalizeHookInput } from "./lib/normalize.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -35,7 +36,7 @@ function exit0() {
 function readStdin() {
   try {
     const raw = fs.readFileSync(0, "utf8");
-    return raw.trim() ? JSON.parse(raw) : {};
+    return raw.trim() ? normalizeHookInput(JSON.parse(raw)) : {};
   } catch {
     return null;
   }
@@ -74,7 +75,7 @@ function toolHaystack(toolName, input, response) {
   let resp = response;
   if (resp && typeof resp === "object") {
     const parts = [];
-    for (const k of ["stdout", "stderr", "output", "content", "result", "error", "message"]) if (typeof resp[k] === "string") parts.push(resp[k]);
+    for (const k of ["stdout", "stderr", "output", "output_for_prompt", "content", "result", "error", "message"]) if (typeof resp[k] === "string") parts.push(resp[k]);
     if (Array.isArray(resp.content)) for (const c of resp.content) if (c && typeof c.text === "string") parts.push(c.text);
     resp = parts.join("\n");
   }

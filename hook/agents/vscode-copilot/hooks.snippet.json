@@ -1,11 +1,16 @@
 {
+  "_comment": "Reference only. Prefer `node hook/setup.mjs --register vscode-copilot`. VS Code loads .github/hooks/*.json (PascalCase + command). Copilot CLI uses the same folder with camelCase + bash/powershell. This file includes both.",
+  "version": 1,
   "hooks": {
+    "SessionStart": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event SessionStart", "timeout": 10 }],
+    "UserPromptSubmit": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event UserPromptSubmit", "timeout": 10 }],
+    "PostToolUse": [
+      { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse", "timeout": 10 },
+      { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event PostToolUse --package-install", "timeout": 10 }
+    ],
     "Stop": [
-      {
-        "type": "command",
-        "command": "node /ABSOLUTE/PATH/TO/hook/agents/vscode-copilot/stop-hook.mjs",
-        "timeout": 60
-      }
+      { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event Stop", "timeout": 20 },
+      { "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/agents/vscode-copilot/stop-hook.mjs\"", "timeout": 15 }
     ]
   }
 }

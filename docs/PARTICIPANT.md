@@ -25,14 +25,14 @@ You will occasionally see your agent do an "XRPL developer experience check" at 
 
 ## What works where
 
-| channel | Claude Code | Cursor | Codex | VS Code Copilot |
-|---|---|---|---|---|
-| passive hooks (prompts, tool results, retries) | yes | no | no | no |
-| reflection (model-judged, end of turn) | yes, on signal | yes, sampled | yes, sampled | via instructions file |
-| `/xrpl-feedback` | yes | yes | yes | no |
-| `/xrpl-session-analysis` | yes | yes | yes | no |
+| channel | Claude Code | Cursor | Codex | GitHub Copilot | Grok Build |
+|---|---|---|---|---|---|
+| passive hooks (prompts, tool results, retries) | yes | yes | yes | yes, best effort | partial: prompts and commands, tool output not documented |
+| reflection (model-judged, end of turn) | yes, on signal | yes, on signal | yes, on signal | yes, on signal | not documented by Grok |
+| `/xrpl-feedback` | yes | yes | yes | if skills are enabled | yes |
+| `/xrpl-session-analysis` | yes | yes | yes | if skills are enabled | yes |
 
-Passive capture is Claude Code only in v2 because Cursor and Codex do not expose the equivalent hooks. If you work in Cursor or Codex, `/xrpl-feedback` and `/xrpl-session-analysis` are the way your friction gets counted; please use them.
+Claude Code, Cursor and Codex were checked against their hook documentation. Copilot and Grok support was contributed and follows their docs but has not been exercised in a real event yet. Whatever your agent, `/xrpl-feedback` and `/xrpl-session-analysis` always count.
 
 ## What is captured, what is not
 

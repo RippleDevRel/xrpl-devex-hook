@@ -8,11 +8,12 @@ import { loadIdentity, isActive } from "./identity.mjs";
 import { loadState, saveState, sessionOf } from "./state.mjs";
 import { loadAllowlist, compileAllowlist, matchText } from "./matcher.mjs";
 import { passesSampling } from "../sampling.mjs";
+import { normalizeHookInput } from "./normalize.mjs";
 
 export function readStdinJson() {
   try {
     const raw = fs.readFileSync(0, "utf8");
-    return raw.trim() ? JSON.parse(raw) : {};
+    return raw.trim() ? normalizeHookInput(JSON.parse(raw)) : {};
   } catch {
     return null;
   }

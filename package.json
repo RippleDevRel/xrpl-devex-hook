@@ -1,6 +1,6 @@
 {
   "name": "xrpl-devex-hook",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "description": "XRPL DevEx Capture, participant side: Claude Code hooks and agent skills that record XRPL developer friction under a pseudonym. Zero dependencies, Node 18+.",

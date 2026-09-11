@@ -10,12 +10,12 @@ Four channels, one taxonomy (`docs/TAXONOMY.md`):
 
 | channel | mechanism | agents |
 |---|---|---|
-| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code |
-| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code (signal), Cursor, Codex, VS Code Copilot (sampled) |
-| `/xrpl-feedback` | you type what happened, the model classifies it, one-line ack | Claude Code, Cursor, Codex |
-| `/xrpl-session-analysis` | the model writes a report plus JSON from the transcript and hook evidence, asks before submitting | Claude Code, Cursor, Codex |
+| passive hooks | `capture.mjs` runs on `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `PreCompact`, `SessionEnd`. Records only text with an XRPL allowlist hit, buffers locally in `.xrpl-devex/`, flushes in batches on `Stop` and `SessionEnd`. Always exits 0, never prints to you. | Claude Code, Cursor, Codex (verified against their hook docs); GitHub Copilot and Grok Build (best effort, see below) |
+| reflection | a `Stop` hook injects an instruction into the agent's own model when the turn had an XRPL error, a result code, or a strong XRPL mention (plus a 10 percent random fallback). The model may submit one structured item via `submit.mjs`. | Claude Code, Codex (exit 2), Cursor (`followup_message`), GitHub Copilot (JSON `decision: block`); Grok does not document a way to continue the turn |
+| `/xrpl-feedback` | you type what happened, the model classifies it, one-line ack | Claude Code, Cursor, Codex, Grok |
+| `/xrpl-session-analysis` | the model writes a report plus JSON from the transcript and hook evidence, asks before submitting | Claude Code, Cursor, Codex, Grok |
 
-Passive capture exists only in Claude Code in v2: Cursor and Codex do not expose the equivalent of `UserPromptSubmit` and `PostToolUse`. Organizers should know this skews the sample.
+Cursor maps `beforeSubmitPrompt`, `afterShellExecution`, `afterFileEdit` and `afterMCPExecution` onto the same capture script. Codex `PostToolUse` covers `Bash` and `apply_patch`. All stdin shapes (snake_case, camelCase, Cursor top-level `command` and `output`, Copilot CLI `toolArgs`) are normalized in `hook/lib/normalize.mjs`.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Passive capture exists only in Claude Code in v2: Cursor and Codex do not expose
 ## Two layouts
 
 - **This repo is the project.** You cloned the hook repo and work inside it. `REPO` and the project root are the same directory.
-- **Vendored.** The repo sits in a subfolder of your project (for example the event starter repo ships it). `REPO` is that subfolder; the project root is where your agent's `.claude/`, `.cursor/` or `.codex/` lives. Every command below works in both cases because `setup.mjs` emits absolute paths, which is the fix for the classic failure where `$CLAUDE_PROJECT_DIR/hook/...` resolves to the outer project and the hook dies with exit 127.
+- **Vendored.** The repo sits in a subfolder of your project (for example the event starter repo ships it). `REPO` is that subfolder; the project root is where your agent's `.claude/`, `.grok/`, `.cursor/` or `.codex/` lives. Every command below works in both cases because `setup.mjs` emits absolute paths, which is the fix for the classic failure where `$CLAUDE_PROJECT_DIR/hook/...` resolves to the outer project and the hook dies with exit 127.
 
 Data always lives in `<project root>/.xrpl-devex/` (gitignored, `setup.mjs` adds the line).
 
@@ -40,7 +40,7 @@ node REPO/hook/setup.mjs
 
 Shows the consent paragraph, asks yes or no, then the team name. Writes `.xrpl-devex/identity.json` with a random pseudonym like `plain-ibex-69`. No real name.
 
-### AI agent
+### Agent
 
 Do not launch the interactive prompt in a non-interactive shell. Show the developer the text from `node REPO/hook/setup.mjs --show-consent`, ask for consent and team name in chat, then:
 
@@ -54,29 +54,64 @@ Optional: `--project /path/to/project` when running from elsewhere.
 
 ## Step 2: register the hooks (project scoped, never global)
 
+Consent (`--non-interactive` or the interactive prompt) registers the agent it detects from the environment (Claude Code, Cursor, Codex, Grok Build or GitHub Copilot) and installs the skills. Name the agent explicitly when running from a plain shell or another agent:
+
+```bash
+node REPO/hook/setup.mjs --register claude-code        # or cursor, codex, grok, vscode-copilot, all
+CONSENT=yes TEAM_NAME="..." node REPO/hook/setup.mjs --non-interactive --agent cursor
+```
+
+Every file is written inside the project, never in a home directory, and every hook calls the same `hook/capture.mjs`. The generated files carry absolute local paths, so they must not be committed: Claude Code hooks go to `.claude/settings.local.json` (ignored by convention), the dedicated Grok and Copilot files are added to the project `.gitignore`, and `setup.mjs` warns about the merged `.cursor/hooks.json` and `.codex/hooks.json`. `--unregister` removes everything this setup wrote.
+
+Trust the project before hooks run: `/hooks-trust` in Grok, `/hooks` in Claude Code, Codex and Cursor.
+
 ### Claude Code
 
 ```bash
 node REPO/hook/setup.mjs --register claude-code
 ```
 
-Merges the registrations with absolute paths into `<project>/.claude/settings.json`, keeps any hooks you already had, and is idempotent. `--unregister claude-code` removes only ours. To see or paste the block yourself: `node REPO/hook/setup.mjs --emit-hooks --agent claude-code`. Reference copy: `hook/agents/claude-code/settings.snippet.json`.
+Merges the registrations with absolute paths into `<project>/.claude/settings.local.json` (the project-local file Claude Code keeps out of git), keeps any hooks you already had there, and is idempotent. `--unregister claude-code` removes only ours, from both `settings.local.json` and an older `settings.json`. To see or paste the block yourself: `node REPO/hook/setup.mjs --emit-hooks --agent claude-code`. Reference copy: `hook/agents/claude-code/settings.snippet.json`.
 
 What gets registered: `SessionStart`, `UserPromptSubmit`, `PostToolUse` (matcher `Bash|Write|Edit|Read|WebFetch|WebSearch`, plus one handler per install pattern with `"if": "Bash(npm install *)"` and friends), `PostToolUseFailure` (`Bash|Write|Edit`), two `Stop` handlers (flush plus nudge, and the reflection hook), `PreCompact`, `SessionEnd` with `"timeout": 10` (mandatory: SessionEnd hooks share a 1.5 second budget otherwise and the flush would be killed).
 
 Run `/hooks` in Claude Code to confirm. A running session may need a restart to pick up new registrations.
 
+### Grok
+
+```bash
+node REPO/hook/setup.mjs --register grok
+```
+
+Writes `<project>/.grok/hooks/xrpl-devex.json` with absolute command strings (Grok does not use Claude's `command` + `args` split) and adds it to the project `.gitignore`. Then `/hooks-trust` in the project; until the folder is trusted, Grok skips project hooks. `/hooks` lists them. Reference: `hook/agents/grok/hooks.snippet.json`. `--unregister grok` deletes that file.
+
+Grok Build's hook docs confirm the events and the camelCase stdin (`hookEventName`, `sessionId`, `cwd`, `workspaceRoot`, `toolName`, `toolInput`) and say Claude tool names such as `Bash`, `Read` and `Edit` are mapped automatically. They do not document tool results on `PostToolUse`, nor `stop_hook_active` or `last_assistant_message` on `Stop`, and they state that stdout is ignored on passive events. Expect prompts, commands and package installs to be captured, tool output and the reflection channel to be best effort until verified in a real session.
+
 ### Cursor
 
-`node REPO/hook/setup.mjs --emit-hooks --agent cursor`, paste into `<project>/.cursor/hooks.json`. Reference: `hook/agents/cursor/hooks.snippet.json`. Keep `loop_limit: 2`.
+```bash
+node REPO/hook/setup.mjs --register cursor
+```
+
+Merges into `<project>/.cursor/hooks.json` (version 1): `sessionStart`, `beforeSubmitPrompt`, `afterShellExecution` (plus package-install), `afterMCPExecution`, `afterFileEdit`, `postToolUseFailure`, `preCompact`, `sessionEnd`, and `stop` (`loop_limit: 2` on the reflection handler). Cursor stdin uses `conversation_id`, `workspace_roots`, and top-level `command`/`output` on shell events; capture normalizes that. `--unregister cursor` removes only ours. Alternative: `--emit-hooks --agent cursor`.
 
 ### Codex
 
-`node REPO/hook/setup.mjs --emit-hooks --agent codex`, paste into `<project>/.codex/hooks.json`, or use the `[[hooks.Stop]]` form from `hook/agents/codex/config.toml.snippet` in the project's `.codex/config.toml`.
+```bash
+node REPO/hook/setup.mjs --register codex
+```
 
-### VS Code Copilot
+Merges into `<project>/.codex/hooks.json` (SessionStart, UserPromptSubmit, PostToolUse for Bash and apply_patch, Stop, PreCompact, SessionEnd). Codex requires you to trust project hooks in `/hooks` before they run. SessionEnd timeout is 3 seconds (Codex's cap). Alternative: `--emit-hooks --agent codex`, or the TOML form in `hook/agents/codex/config.toml.snippet`. `--unregister codex` removes only ours.
 
-VS Code exposes a `Stop` hook, but it is not confirmed that it re-invokes the model to run a command. Primary, reliable path: paste the output of `node REPO/hook/print-instruction.mjs` under the heading in `hook/agents/vscode-copilot/copilot-instructions.snippet.md` into `<project>/.github/copilot-instructions.md`. Optional backup: `node REPO/hook/setup.mjs --emit-hooks --agent vscode-copilot` into `<project>/.github/hooks/xrpl-devex.json`. Make sure Copilot can run terminal commands.
+### GitHub Copilot (VS Code and CLI)
+
+```bash
+node REPO/hook/setup.mjs --register vscode-copilot
+```
+
+Writes `<project>/.github/hooks/xrpl-devex.json` (version 1) and adds it to the project `.gitignore`. VS Code loads the PascalCase events (`SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `PreCompact`) with a `command` string; Copilot CLI reads the same file's camelCase aliases (`sessionStart`, `userPromptSubmitted`, `postToolUse`, `agentStop`, `sessionEnd`) with `bash`/`powershell` and `timeoutSec`. Tool names such as `runTerminalCommand`, `editFiles`, `createFile` and `replace_string_in_file` are normalized. The Stop hook continues the agent with a JSON `decision: "block"` on stdout, which both VS Code and the CLI document; exit 2 would only show an error. `--unregister vscode-copilot` deletes that file.
+
+Optional extra: paste `node REPO/hook/print-instruction.mjs` into `.github/copilot-instructions.md` if hooks are disabled by org policy.
 
 ### Any other agent (fallback, for an AI installer)
 
@@ -93,13 +128,15 @@ bash REPO/skills/install.sh                       # this repo is the project
 bash REPO/skills/install.sh --project /path/to/project   # vendored
 ```
 
-Links (or copies on Windows) `xrpl-setup`, `xrpl-status`, `xrpl-feedback`, `xrpl-session-analysis` into `.claude/skills`, `.cursor/skills` and `.codex/skills`. Windows: `powershell -ExecutionPolicy Bypass -File REPO\skills\install.ps1`. Organizers add `--organizer` to also get `xrpl-team-report`.
+Links (or copies on Windows) `xrpl-setup`, `xrpl-status`, `xrpl-feedback`, `xrpl-session-analysis` into `.claude/skills`, `.cursor/skills`, `.codex/skills` and `.grok/skills`. Windows: `powershell -ExecutionPolicy Bypass -File REPO\skills\install.ps1`. Organizers add `--organizer` to also get `xrpl-team-report`.
 
 ## Step 4: test
 
 ```bash
 node REPO/hook/status.mjs
 ```
+
+(The test suite lives in the reference repo, `xrpl-devex-capture`.)
 
 Shows pseudonym, team, event, whether hooks are registered, and buffered and sent counts. Then test the pieces:
 
@@ -138,11 +175,10 @@ If the organizer has not filled in `endpoint` and `ingest_key` yet, everything s
 ## Uninstall
 
 ```bash
-node REPO/hook/setup.mjs --unregister claude-code      # Claude Code hooks
-rm -rf <project>/.xrpl-devex                            # local data and identity
+node REPO/hook/setup.mjs --unregister
 ```
 
-For other agents, remove the block you pasted. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`.
+Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` directory) for local data. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`, `.grok/skills`.
 
 ## Safety notes
 
@@ -152,7 +188,7 @@ For other agents, remove the block you pasted. Skills: delete the `xrpl-*` entri
 
 ## Troubleshooting
 
-- `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register claude-code` and check `/hooks`.
+- `/xrpl-status` says hooks NOT registered: run `node REPO/hook/setup.mjs --register <agent>` and check `/hooks`. Grok also needs `/hooks-trust`.
 - Nothing ever gets sent, buffer keeps growing: `endpoint` or `ingest_key` still say `REPLACE-ME`, or the Worker is unreachable. Run `node REPO/hook/submit.mjs --retry-pending` to see the error.
 - Claude continues after a turn with an "XRPL developer experience check": that is the reflection hook doing its job. Set `XRPL_DEVEX_REFLECTION_SAMPLE=0` to reduce it to error-triggered turns only, or `/xrpl-setup disable` to remove all hooks.
 - Cursor loops: make sure `loop_limit` is set in `.cursor/hooks.json`.

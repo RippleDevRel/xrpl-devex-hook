@@ -5,6 +5,9 @@
 .claude/skills/
 .cursor/
 .codex/
+.grok/hooks/
+.grok/skills/
+.github/hooks/xrpl-devex.json
 .claude/settings.local.json
 
 # Organizer exports
