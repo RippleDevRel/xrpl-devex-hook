@@ -60,7 +60,7 @@ export function claudeCodeHooks() {
         {
           hooks: [
             capture("Stop", [], 20),
-            { type: "command", command: "node", args: [abs("stop-hook.mjs")], timeout: 15 },
+            { type: "command", command: "node", args: [abs("agents/claude-code/stop-hook.mjs")], timeout: 15 },
           ],
         },
       ],

@@ -219,7 +219,10 @@ async function main() {
       session.turn_errors = 0;
       session.turn_result_codes = [];
       const prompt = typeof input.prompt === "string" ? input.prompt : "";
-      if (prompt && !/^\s*\/xrpl-/i.test(prompt)) {
+      // A turn that invokes one of our skills is ours: not recorded, and the
+      // reflection stop hook stays quiet on it.
+      session.skill_turn = /^\s*\/xrpl-/i.test(prompt);
+      if (prompt && !session.skill_turn) {
         const m = matchText(prompt, compiled());
         if (m.strong) {
           const keepText = config.prompt_text === "always" || (config.prompt_text === "signal" && promptHasSignal(prompt, m));

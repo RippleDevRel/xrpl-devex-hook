@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Shared Stop hook for Claude Code, Grok and Codex. stdin is normalized
+// Shared Stop hook for Codex and Grok (exit 2 plus stderr, which Codex
+// documents as a continuation). Claude Code uses agents/claude-code/stop-hook.mjs
+// (JSON additionalContext) and Cursor agents/cursor/stop-hook.mjs. stdin is normalized
 // (camelCase or snake_case). Fires on a turn error, a strong allowlist match
 // in the last assistant message, or the random sample. Injects via exit 2
 // plus stderr. Never loops: stop_hook_active, cooldown and the per-session cap

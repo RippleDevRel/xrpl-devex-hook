@@ -145,7 +145,7 @@ node REPO/hook/status.mjs
 Shows pseudonym, team, event, whether hooks are registered, and buffered and sent counts. Then test the pieces:
 
 ```bash
-# the reflection hook injects on an XRPL error (exit 2 and the instruction on stderr), nothing is submitted here
+# the reflection hook injects on an XRPL error: exit 0 and a JSON hookSpecificOutput.additionalContext on stdout, nothing is submitted here
 printf '{"hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"VaultDeposit failed with tecNO_PERMISSION"}' | node REPO/hook/agents/claude-code/stop-hook.mjs; echo "exit $?"
 
 # an invalid item is rejected
@@ -187,7 +187,7 @@ Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` d
 
 ## Safety notes
 
-- Hooks never break a turn: parse problem, missing config, network down, all exit 0 silently. The only hook that exits 2 is the reflection stop hook, by design, and it never fires inside its own continuation (`stop_hook_active`), during the cooldown or past the per-session cap.
+- Hooks never break a turn: parse problem, missing config, network down, all exit 0 silently. The reflection stop hook continues the turn on purpose (Claude Code: JSON `additionalContext`, shown as "Stop hook feedback"; Codex and Grok: exit 2; Cursor: `followup_message`; Copilot: JSON `decision: block`) and never fires inside its own continuation (`stop_hook_active`), on a turn that ran one of our skills, during the cooldown or past the per-session cap.
 - Nothing is stored without an XRPL allowlist hit. File contents are never stored (only the file name for XRPL-related writes). A redaction pass removes seeds, hex keys, bearer tokens and `KEY=`, `TOKEN=`, `SECRET=` values before anything is written.
 - What leaves the machine: pseudonym, team, event id, and the events described in `docs/PRIVACY.md`, sent only to the organizer's Worker.
 

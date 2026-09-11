@@ -1,5 +1,6 @@
 // The reflection instruction injected into the agent's own model by the Stop
-// hooks (exit 2 + stderr on Claude Code and Codex, followup_message on Cursor).
+// hooks (JSON additionalContext on Claude Code, exit 2 + stderr on Codex and
+// Grok, followup_message on Cursor, JSON decision block on Copilot).
 // No external LLM is called: the model judges the turn and, if warranted, runs
 // submit.mjs with a JSON object in our taxonomy. Ported from the SingHacks
 // repo, payload changed from a free paragraph to structured JSON.
@@ -62,10 +63,7 @@ export function buildInstruction({ submitPath, sessionId = null, signal = null, 
   if (isConfigured(config)) {
     lines.push(
       "",
-      "If node is not available, POST the same fields directly. Read team and participant_id from .xrpl-devex/identity.json in the project, set id to a fresh UUID and ts to the current ISO time:",
-      "",
-      `    curl -s -X POST ${config.endpoint}/ingest -H "Content-Type: application/json" -H "X-Ingest-Key: ${config.ingest_key}" \\`,
-      `      -d '{"participant":{"participant_id":"<pseudonym>","event":"${config.event}","team":"<team>","consented_at":"<from identity.json>"},"events":[{"id":"<uuid>","event":"${config.event}","team":"<team>","participant_id":"<pseudonym>","ts":"<iso>","channel":"reflection","kind":"reflection","evidence":"inferred","surface":"...","friction_type":"...","feature":null,"tx_type":null,"result_code":null,"summary":"...","text":"..."}]}'`,
+      `If node is not available, POST the same fields to ${config.endpoint}/ingest as JSON {"participant":{...},"events":[{...}]} with headers X-Ingest-Key (ingest_key from hook/devex.config.json) and, when the event is invite only, X-Invite-Code (invite_code from .xrpl-devex/identity.json). Take participant_id, team and consented_at from identity.json, set id to a fresh UUID, ts to the current ISO time, channel and kind to "reflection", evidence to "inferred".`,
     );
   }
   lines.push("", "If nothing qualifies, do nothing at all. Either way, write at most one short line to the user about this.");
