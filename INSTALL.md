@@ -161,11 +161,11 @@ In your agent, type `/xrpl-status`, then `/xrpl-feedback the devnet faucet is sl
 | key | default | meaning |
 |---|---|---|
 | `retention_days` | 90 | stated in the consent text; enforced server side |
-| `flush_max_batch` | 25 | flush on `Stop` when the buffer reaches this many events |
-| `flush_max_age_seconds` | 600 | or when the oldest buffered event is older than this |
+| `flush_max_batch` | 10 | flush on `Stop` when the buffer reaches this many events |
+| `flush_max_age_seconds` | 60 | or when the oldest buffered event is older than this, so the organizer's feed lags one turn at most |
 | `flush_timeout_seconds` | 3 | hard timeout per network call |
 | `reflection_sample` | 0.1 | random fallback rate for turns with no XRPL signal (0 to 1) |
-| `reflection_cooldown_turns` | 3 | minimum turns between two reflection prompts |
+| `reflection_cooldown_turns` | 3 | minimum turns between two random-fallback reflection prompts; an XRPL error or a strong XRPL mention fires regardless (at most once per turn) |
 | `reflection_max_per_session` | 8 | cap on reflection items per session |
 | `nudge_after_turns` | 40 | one-time reminder to run `/xrpl-session-analysis` |
 | `nudge_after_minutes` | 180 | or after this long |

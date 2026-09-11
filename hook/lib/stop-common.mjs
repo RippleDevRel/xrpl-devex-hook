@@ -33,10 +33,12 @@ export function decideReflection(input, { useSignal = true } = {}) {
 
   if (session.skill_turn) return { fire: false, reason: "skill turn" };
   if (session.reflections_sent >= config.reflection_max_per_session) return { fire: false, reason: "max per session" };
-  if (session.last_reflection_turn !== null && session.turn - session.last_reflection_turn < config.reflection_cooldown_turns) {
-    return { fire: false, reason: "cooldown" };
-  }
+  const inCooldown = session.last_reflection_turn !== null && session.turn - session.last_reflection_turn < config.reflection_cooldown_turns;
 
+  // A real signal (an XRPL error captured this turn, or a strong XRPL mention in
+  // the answer) fires even during the cooldown: the cooldown only paces the
+  // random fallback, so a lucky sample on a quiet turn can never silence the
+  // error turn that follows. One prompt per turn and the per-session cap still hold.
   let signal = null;
   if (useSignal) {
     if (session.turn_errors > 0) signal = "error";
@@ -45,8 +47,9 @@ export function decideReflection(input, { useSignal = true } = {}) {
       if (m.strong) signal = "match";
     }
   }
-  if (!signal && passesSampling(config)) signal = "sample";
-  if (!signal) return { fire: false, reason: "no signal" };
+  if (session.last_reflection_turn === session.turn) return { fire: false, reason: "already prompted this turn" };
+  if (!signal && !inCooldown && passesSampling(config)) signal = "sample";
+  if (!signal) return { fire: false, reason: inCooldown ? "cooldown" : "no signal" };
 
   session.last_reflection_turn = session.turn;
   session.reflection_prompts = (session.reflection_prompts || 0) + 1;

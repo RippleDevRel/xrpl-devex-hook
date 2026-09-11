@@ -133,6 +133,12 @@ function promptHasSignal(prompt, m) {
   return Boolean(m.tx_type || m.result_code || PROBLEM_RE.test(prompt));
 }
 
+// Our own repo and data directory show up in commands and listings ("git pull
+// xrpl-devex-hook", "ls .xrpl-devex"): the "xrpl" inside must not count as a hit.
+function stripOwn(text) {
+  return typeof text === "string" ? text.replace(/\.?xrpl-devex[\w.-]*/gi, " ").replace(/XRPL DevEx Capture/gi, " ") : text;
+}
+
 function firstUrl(text) {
   const u = typeof text === "string" ? text.match(/https?:\/\/[^\s"'<>)]+/) : null;
   return u ? u[0] : null;
@@ -223,7 +229,7 @@ async function main() {
       // reflection stop hook stays quiet on it.
       session.skill_turn = /^\s*\/xrpl-/i.test(prompt);
       if (prompt && !session.skill_turn) {
-        const m = matchText(prompt, compiled());
+        const m = matchText(stripOwn(prompt), compiled());
         if (m.strong) {
           const keepText = config.prompt_text === "always" || (config.prompt_text === "signal" && promptHasSignal(prompt, m));
           const payload = { ...matchSummary(m), turn: session.turn, chars: prompt.length };
@@ -264,14 +270,21 @@ async function main() {
 
       const hay = toolHaystack(toolName, toolInput, failedEvent ? String(input.error || "") : input.tool_response);
       if (toolName === "Bash" && isOwnCommand(toolInput.command, hay.output)) break;
-      const text = hay.subject + "\n" + hay.output;
+      const text = stripOwn(hay.subject) + "\n" + stripOwn(hay.output);
       const rawMatch = matchText(text, compiled());
       if (!rawMatch.strong) break;
       if ((toolName === "WebFetch" || toolName === "WebSearch") && !rawMatch.matches.some((x) => x.kind === "domain") && toolName === "WebFetch") break;
 
       const docLike = looksLikeDocs(rawMatch);
+      // A result code is only real when it appears in what the tool produced,
+      // never in the command itself (a script being patched, a grep for "tec")
+      // and never in file contents written or read. Transaction types may come
+      // from the command (node loanSet.js) as well.
+      const fileTool = toolName === "Write" || toolName === "Edit" || toolName === "Read";
+      const outputMatch = toolName === "Bash" && !docLike ? matchText(stripOwn(hay.output), compiled()) : null;
+      const resultCode = outputMatch ? outputMatch.result_code : null;
       // Documentation being read carries no transaction, no result and no failure of its own.
-      const m = docLike ? { ...rawMatch, tx_type: null, result_code: null, feature: null } : rawMatch;
+      const m = docLike ? { ...rawMatch, tx_type: null, result_code: null, feature: null } : { ...rawMatch, result_code: fileTool ? null : resultCode };
 
       const interrupted = Boolean(input.tool_response && typeof input.tool_response === "object" && input.tool_response.interrupted);
       const failed = failedEvent || interrupted || isErrorCode(m.result_code);

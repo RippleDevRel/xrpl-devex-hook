@@ -134,8 +134,17 @@ export function matchText(text, compiled) {
     strong.push({ kind: "result_code", canonical });
   }
   const lower = text.toLowerCase();
+  // Domains need a boundary on both sides: "github.com/ripple" must not match
+  // "github.com/rippledevrel", and "xrpl.org" must not match "notxrpl.org".
+  const domainBoundary = (ch) => !ch || !/[a-z0-9-]/.test(ch);
   for (const d of compiled.domains) {
-    if (lower.includes(d)) {
+    let idx = lower.indexOf(d);
+    let hit = false;
+    while (idx !== -1 && !hit) {
+      if (domainBoundary(lower[idx - 1]) && domainBoundary(lower[idx + d.length])) hit = true;
+      idx = lower.indexOf(d, idx + 1);
+    }
+    if (hit) {
       const id = "domain:" + d;
       if (seen.has(id)) continue;
       seen.add(id);

@@ -103,6 +103,6 @@ export function participantPayload(identity, config) {
     team: identity.team,
     team_display: identity.team_display || identity.team,
     consented_at: identity.consented_at,
-    client_version: identity.client_version || CLIENT_VERSION,
+    client_version: CLIENT_VERSION,
   };
 }
