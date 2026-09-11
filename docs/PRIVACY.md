@@ -14,8 +14,8 @@ Team plus pseudonym can still be re-identifying in a small cohort: an organizer 
 
 Only when the text has an XRPL allowlist hit (`hook/xrpl-allowlist.json`: transaction types, result codes, xrpl.org and network domains, XRPL field names, XRPL keywords, XRPL packages):
 
-- prompts to the agent, verbatim, truncated to `prompt_max_chars` (default 2000)
-- tool output excerpts for Bash, truncated to `output_max_chars` (default 1500), with the command normalized to basenames
+- prompts to the agent that mention XRPL: counted always, stored verbatim (truncated to `prompt_max_chars`, default 2000) only when they name a transaction type or a result code, or read like a question or a problem report (`prompt_text: "signal"`, the default). A mission statement or a task list that merely mentions xrpl.js is counted, not stored. Organizers can set `prompt_text` to `never` or `always`.
+- tool output excerpts for Bash, truncated to `output_max_chars` (default 1500), with the command normalized to basenames. When the output is documentation being read (a spec, a reference page, type definitions, recognizable by the dozens of transaction types or result codes it lists), no excerpt is stored, only the URL fetched if any, and it counts as neither an error nor a retry
 - for Write, Edit and Read of XRPL-related files: the file name only, never the content
 - XRPL docs URLs fetched, XRPL search queries
 - XRPL packages installed (`npm install xrpl` records `["xrpl"]`, nothing else)

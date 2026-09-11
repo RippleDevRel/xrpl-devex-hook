@@ -36,7 +36,7 @@ Claude Code, Cursor and Codex were checked against their hook documentation. Cop
 
 ## What is captured, what is not
 
-Captured, only when the text contains an XRPL term (transaction type, result code, xrpl.org URL, XRPL package, XRPL keyword): your prompts to the agent (truncated to 2000 characters), tool output excerpts (1500 characters), XRPL docs URLs you fetch, XRPL packages you install, retry counts and time to first success per transaction type, the structured notes your agent writes, and what you submit yourself. Everything passes through a redaction step that removes seeds, hex keys, bearer tokens and `KEY=`, `TOKEN=`, `SECRET=` values.
+Captured, only when the text contains an XRPL term (transaction type, result code, xrpl.org URL, XRPL package, XRPL keyword): the XRPL questions and problem reports you type to your agent (a prompt that only hands out a task is counted but its text is not stored), excerpts of tool outputs that carry an XRPL result (1500 characters; a spec or reference page being read is not stored, only its URL), XRPL docs URLs you fetch, XRPL packages you install, retry counts and time to first success per transaction type, the structured notes your agent writes, and what you submit yourself. Everything passes through a redaction step that removes seeds, hex keys, bearer tokens and `KEY=`, `TOKEN=`, `SECRET=` values.
 
 Not captured: anything without an XRPL hit, file contents (only the file name for XRPL-related writes), git history, environment variables, names, emails.
 

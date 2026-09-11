@@ -8,7 +8,7 @@ export function consentText(config) {
   return (
     `This project takes part in XRPL developer experience research for ${event}. ` +
     "If you consent, a hook in your coding agent records, first to a local file in this project and then to the organizer's server: " +
-    "prompts and tool outputs that mention XRPL (transaction types, result codes, xrpl.org URLs, XRPL packages), truncated; " +
+    "the XRPL questions and error reports you ask your agent (prompts that name a transaction type or a result code, or that describe a problem), truncated; excerpts of tool outputs that carry an XRPL result, and the URLs of XRPL documentation you consult; " +
     "XRPL packages you install; retry counts and time to first success per transaction type; " +
     "short structured notes your agent writes about XRPL friction it observed; " +
     "and anything you submit yourself with /xrpl-feedback or /xrpl-session-analysis. " +

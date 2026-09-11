@@ -102,6 +102,42 @@ function isErrorCode(code) {
   return typeof code === "string" && code !== "tesSUCCESS";
 }
 
+// Our own scripts print XRPL terms by design (status, setup); never capture them.
+function isOwnCommand(command, output) {
+  return (
+    (typeof command === "string" && /\b(capture|status|setup|submit|stop-hook|print-instruction|report|export)\.mjs\b/.test(command)) ||
+    (typeof output === "string" && /^\s*XRPL DevEx Capture \d/.test(output))
+  );
+}
+
+// Reading a spec, a reference page or type definitions produces output that
+// lists dozens of transaction types and result codes. That is documentation
+// being consulted, not an error: no tx_type, no result_code, no failure, no
+// retry tracking, and no text stored (only the URL when the command fetched one).
+const DOC_LIKE = { result_codes: 3, tx_types: 6, matches: 20 };
+function looksLikeDocs(m) {
+  const distinct = (kind) => new Set(m.matches.filter((x) => x.kind === kind).map((x) => x.canonical)).size;
+  return distinct("result_code") > DOC_LIKE.result_codes || distinct("tx_type") > DOC_LIKE.tx_types || m.matches.length > DOC_LIKE.matches;
+}
+
+// Payload matches are capped; the count is kept.
+const MAX_MATCHES = 15;
+function matchSummary(m) {
+  return m.matches.length > MAX_MATCHES ? { matches: m.matches.slice(0, MAX_MATCHES), match_count: m.matches.length } : { matches: m.matches };
+}
+
+// Does a prompt read like a question or a problem report? Used with
+// prompt_text = "signal" together with tx_type and result_code hits.
+const PROBLEM_RE = /\?|\b(why|how|what|which|fail(s|ed|ing|ure)?|error|errors|doesn'?t|does not|didn'?t|can'?t|cannot|won'?t|not work(ing)?|stuck|wrong|issue|problem|reject(ed|s)?|unexpected|invalid|missing|broken|bug|pourquoi|comment|erreur|marche pas|fonctionne pas|bloqu\w*|impossible)\b/i;
+function promptHasSignal(prompt, m) {
+  return Boolean(m.tx_type || m.result_code || PROBLEM_RE.test(prompt));
+}
+
+function firstUrl(text) {
+  const u = typeof text === "string" ? text.match(/https?:\/\/[^\s"'<>)]+/) : null;
+  return u ? u[0] : null;
+}
+
 // Retry-loop bookkeeping on the session ring. Returns { attempt, first_attempt_at, resolved }.
 function retryTrack(session, entry) {
   const key = entry.tx_type ? (e) => e.tx_type === entry.tx_type : (e) => e.normalized_command && e.normalized_command === entry.normalized_command;
@@ -186,6 +222,9 @@ async function main() {
       if (prompt && !/^\s*\/xrpl-/i.test(prompt)) {
         const m = matchText(prompt, compiled());
         if (m.strong) {
+          const keepText = config.prompt_text === "always" || (config.prompt_text === "signal" && promptHasSignal(prompt, m));
+          const payload = { ...matchSummary(m), turn: session.turn, chars: prompt.length };
+          if (!keepText) payload.text_omitted = config.prompt_text === "never" ? "prompt_text=never" : "no_signal";
           events.push(
             makeEvent({
               ...base,
@@ -193,8 +232,8 @@ async function main() {
               tx_type: m.tx_type,
               result_code: m.result_code,
               feature: m.feature,
-              text: truncate(prompt, config.prompt_max_chars),
-              payload: { matches: m.matches, turn: session.turn },
+              text: keepText ? truncate(prompt, config.prompt_max_chars) : null,
+              payload,
             }),
           );
         }
@@ -221,10 +260,15 @@ async function main() {
       if (toolName === "Bash" && isInstallCommand(toolInput.command)) break; // handled by the package_install handler
 
       const hay = toolHaystack(toolName, toolInput, failedEvent ? String(input.error || "") : input.tool_response);
+      if (toolName === "Bash" && isOwnCommand(toolInput.command, hay.output)) break;
       const text = hay.subject + "\n" + hay.output;
-      const m = matchText(text, compiled());
-      if (!m.strong) break;
-      if ((toolName === "WebFetch" || toolName === "WebSearch") && !m.matches.some((x) => x.kind === "domain") && toolName === "WebFetch") break;
+      const rawMatch = matchText(text, compiled());
+      if (!rawMatch.strong) break;
+      if ((toolName === "WebFetch" || toolName === "WebSearch") && !rawMatch.matches.some((x) => x.kind === "domain") && toolName === "WebFetch") break;
+
+      const docLike = looksLikeDocs(rawMatch);
+      // Documentation being read carries no transaction, no result and no failure of its own.
+      const m = docLike ? { ...rawMatch, tx_type: null, result_code: null, feature: null } : rawMatch;
 
       const interrupted = Boolean(input.tool_response && typeof input.tool_response === "object" && input.tool_response.interrupted);
       const failed = failedEvent || interrupted || isErrorCode(m.result_code);
@@ -239,9 +283,10 @@ async function main() {
       }
 
       let stored = null;
-      const payload = { matches: m.matches, turn: session.turn };
+      const payload = { ...matchSummary(rawMatch), turn: session.turn };
+      if (docLike) payload.doc_like = true;
       if (toolName === "Bash") {
-        stored = truncate(hay.output, config.output_max_chars);
+        stored = docLike ? firstUrl(toolInput.command) : truncate(hay.output, config.output_max_chars);
         payload.command = normalizeCommand(toolInput.command);
         if (exitCode !== null) payload.exit_code = exitCode;
       } else if (toolName === "WebFetch") {
@@ -257,7 +302,7 @@ async function main() {
 
       const ev = makeEvent({ ...base, kind: "tool_result", tool_name: toolName, tx_type: m.tx_type, result_code: m.result_code, feature: m.feature, failed, text: stored, payload });
 
-      if (toolName === "Bash") {
+      if (toolName === "Bash" && !docLike) {
         const track = retryTrack(session, {
           tx_type: m.tx_type,
           result_code: m.result_code,

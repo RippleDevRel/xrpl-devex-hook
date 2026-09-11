@@ -27,6 +27,10 @@ export const DEFAULTS = {
   nudge_after_minutes: 180,
   prompt_max_chars: 2000,
   output_max_chars: 1500,
+  // Which prompts keep their text: "signal" (a transaction type, a result code
+  // or wording that describes a question or a problem), "always", or "never"
+  // (the prompt row is still counted, without text).
+  prompt_text: "signal",
 };
 
 const NUMERIC = [
@@ -66,6 +70,7 @@ export function loadConfig() {
     cfg[k] = Number.isFinite(n) ? n : DEFAULTS[k];
   }
   if (!Array.isArray(cfg.focus_features)) cfg.focus_features = [];
+  if (!["signal", "always", "never"].includes(cfg.prompt_text)) cfg.prompt_text = "signal";
   cfg.endpoint = String(cfg.endpoint || "").replace(/\/+$/, "");
   return cfg;
 }

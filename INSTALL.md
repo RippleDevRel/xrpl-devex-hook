@@ -170,6 +170,7 @@ In your agent, type `/xrpl-status`, then `/xrpl-feedback the devnet faucet is sl
 | `nudge_after_turns` | 40 | one-time reminder to run `/xrpl-session-analysis` |
 | `nudge_after_minutes` | 180 | or after this long |
 | `prompt_max_chars` | 2000 | stored prompt length |
+| `prompt_text` | `signal` | which XRPL prompts keep their text: `signal` (names a transaction type or result code, or reads like a question or problem), `always`, `never` (counted, no text) |
 | `output_max_chars` | 1500 | stored tool output length |
 
 Environment overrides: `INVITE_CODE` (event invite code at consent time), `XRPL_DEVEX_CONFIG` (path to another config file), `XRPL_DEVEX_ENDPOINT`, `XRPL_DEVEX_INGEST_KEY`, `XRPL_DEVEX_EVENT`, `XRPL_DEVEX_REFLECTION_SAMPLE` (set to `0` to pause the reflection, `1` for every turn), `XRPL_DEVEX_PROJECT_DIR` (where `.xrpl-devex/` lives), `XRPL_DEVEX_DEBUG=1` (writes diagnostics to `.xrpl-devex/debug.log`).
