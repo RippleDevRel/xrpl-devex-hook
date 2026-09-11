@@ -139,6 +139,16 @@ function stripOwn(text) {
   return typeof text === "string" ? text.replace(/\.?xrpl-devex[\w.-]*/gi, " ").replace(/XRPL DevEx Capture/gi, " ") : text;
 }
 
+// SDK exceptions without a result code, as printed when thrown ("Name: message"
+// or "Name(...)" in a Python traceback), not as read in source code
+// ("new errors_1.XRPLFaucetError("). Counts as a failure for the turn.
+const ERROR_CLASS_RE = /(?<![\w.])((?:XRPL|Xrpl|Rippled)\w*(?:Error|Exception)|ValidationError|NotConnectedError|DisconnectedError|ResponseFormatError|XRPLFaucetError)(?::\s|\s*\(|\s+-\s)/;
+function detectErrorClass(output) {
+  if (typeof output !== "string") return null;
+  const m = output.match(ERROR_CLASS_RE);
+  return m ? m[1] : null;
+}
+
 function firstUrl(text) {
   const u = typeof text === "string" ? text.match(/https?:\/\/[^\s"'<>)]+/) : null;
   return u ? u[0] : null;
@@ -287,7 +297,8 @@ async function main() {
       const m = docLike ? { ...rawMatch, tx_type: null, result_code: null, feature: null } : { ...rawMatch, result_code: fileTool ? null : resultCode };
 
       const interrupted = Boolean(input.tool_response && typeof input.tool_response === "object" && input.tool_response.interrupted);
-      const failed = failedEvent || interrupted || isErrorCode(m.result_code);
+      const errorClass = toolName === "Bash" && !docLike ? detectErrorClass(hay.output) : null;
+      const failed = failedEvent || interrupted || isErrorCode(m.result_code) || Boolean(errorClass);
       let exitCode = null;
       if (failedEvent) {
         const em = String(input.error || "").match(/^Exit code (\d+)/);
@@ -301,6 +312,7 @@ async function main() {
       let stored = null;
       const payload = { ...matchSummary(rawMatch), turn: session.turn };
       if (docLike) payload.doc_like = true;
+      if (errorClass) payload.error_class = errorClass;
       if (toolName === "Bash") {
         stored = docLike ? firstUrl(toolInput.command) : truncate(hay.output, config.output_max_chars);
         payload.command = normalizeCommand(toolInput.command);
