@@ -6,20 +6,26 @@
 import path from "node:path";
 import { REPO_DIR, HOOK_DIR, fwd } from "./lib/paths.mjs";
 
-export function buildCheckpointInstruction({ sessionId, periodStart, events, hours, config }) {
+export function buildCheckpointInstruction({ sessionId, periodStart, events, hours, config, commit = null }) {
   const skill = fwd(path.join(REPO_DIR, "skills", "xrpl-session-analysis", "SKILL.md"));
   const submit = fwd(path.join(HOOK_DIR, "submit.mjs"));
   const focus = Array.isArray(config.focus_features) && config.focus_features.length ? config.focus_features.join(", ") : "any XRPL feature";
+  const trigger = commit ? "commit" : "checkpoint";
+  const extraJson = commit ? `, "commit": "${commit.hash}"` : "";
+  const extraFlag = commit ? ` --commit ${commit.hash}` : "";
+  const opening = commit
+    ? `XRPL DevEx checkpoint at commit ${commit.hash}${commit.message ? ` (${JSON.stringify(commit.message)})` : ""}. This session has ${events} XRPL events since ${periodStart} and no analysis for that period. The organizer of this event asked for an automatic session analysis when a commit closes a period of XRPL work (at most one every ${config.analysis_commit_cooldown_minutes} minutes; the ${config.analysis_checkpoint_hours} hour checkpoint still applies otherwise).`
+    : `XRPL DevEx checkpoint. This session has ${events} XRPL events over the last ${hours} hour(s) (since ${periodStart}) and no analysis for that period. The organizer of this event asked for an automatic session analysis every ${config.analysis_checkpoint_hours} hour(s).`;
   return [
-    `XRPL DevEx checkpoint. This session has ${events} XRPL events over the last ${hours} hour(s) (since ${periodStart}) and no analysis for that period. The organizer of this event asked for an automatic session analysis every ${config.analysis_checkpoint_hours} hour(s).`,
+    opening,
     "",
     `Run the session analysis procedure now, in checkpoint mode. The procedure, the surface and friction_type values, the fixed report structure and the JSON shape are in ${skill}; read that file first. Event focus features: ${focus}.`,
     "",
     "Checkpoint mode differs from a manual run in four ways:",
-    `- cover only the period since ${periodStart}; use the transcript in context and the hook evidence in .xrpl-devex/buffer.jsonl and .xrpl-devex/sent.jsonl for this session`,
+    `- cover only the period since ${periodStart}${commit ? ", closed by the commit above" : ""}; use the transcript in context and the hook evidence in .xrpl-devex/buffer.jsonl and .xrpl-devex/sent.jsonl for this session`,
     "- do not ask the developer anything: state coverage honestly and list open questions under Not observed",
-    `- add "trigger": "checkpoint" and "period_start": "${periodStart}" to the JSON block`,
-    `- submit without asking: node ${JSON.stringify(submit)} --analysis <json path> --markdown <md path> --session ${JSON.stringify(sessionId)} --checkpoint`,
+    `- add "trigger": "${trigger}", "period_start": "${periodStart}"${extraJson} to the JSON block`,
+    `- submit without asking: node ${JSON.stringify(submit)} --analysis <json path> --markdown <md path> --session ${JSON.stringify(sessionId)} --checkpoint${extraFlag}`,
     "",
     "Write both files to .xrpl-devex/reports/session-analysis-<YYYYMMDD-HHMMSS>.md and .json. Redact seeds, keys, tokens and private URLs as the procedure says. Everything in English.",
     "If the period holds no XRPL work worth reporting, submit nothing.",

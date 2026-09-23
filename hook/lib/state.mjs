@@ -36,6 +36,8 @@ export function newSession(sessionId, now = new Date()) {
     checkpoint_prompted_at: null,
     checkpoint_turn: null,
     checkpoints_submitted: 0,
+    // a git commit made through the agent since the last analysis, or null
+    commit_since_analysis: null,
   };
 }
 

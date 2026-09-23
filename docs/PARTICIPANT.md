@@ -18,7 +18,7 @@ The agent shows you a consent paragraph and asks for your team name. Say yes or 
 |---|---|---|
 | something annoys you or works well | `/xrpl-feedback the VaultDeposit page does not say who can deposit` | 5 seconds, one-line reply |
 | mid-day and end of day | `/xrpl-session-analysis` | 2 minutes; the agent writes a report, shows you the top, asks before submitting. You own the file in `.xrpl-devex/reports/`. |
-| every 2 hours of XRPL work (automatic) | checkpoint analysis | at the end of a turn, your agent writes a short analysis of the last period and submits it, then tells you in one line where the report is. You lose two or three minutes of agent time; nothing to do. |
+| every 2 hours of XRPL work, or when a git commit made through your agent closes a piece of work (automatic, at most one every 30 minutes) | checkpoint analysis | at the end of a turn, your agent writes a short analysis of the last period and submits it, then tells you in one line where the report is. You lose two or three minutes of agent time; nothing to do. |
 | "is this thing on?" | `/xrpl-status` | instant, no network |
 | you change your mind | `/xrpl-setup disable`, or delete `.xrpl-devex/identity.json` | |
 

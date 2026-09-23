@@ -30,6 +30,9 @@ export const DEFAULTS = {
   // submit it without review. 0 disables and leaves the manual reminder only.
   analysis_checkpoint_hours: 2,
   analysis_checkpoint_min_events: 5,
+  // a git commit made through the agent closes a period; at most one commit
+  // checkpoint per this many minutes, the hourly checkpoint stays as fallback
+  analysis_commit_cooldown_minutes: 30,
   prompt_max_chars: 2000,
   output_max_chars: 1500,
   // Which prompts keep their text: "signal" (a transaction type, a result code
@@ -50,6 +53,7 @@ const NUMERIC = [
   "nudge_after_minutes",
   "analysis_checkpoint_hours",
   "analysis_checkpoint_min_events",
+  "analysis_commit_cooldown_minutes",
   "prompt_max_chars",
   "output_max_chars",
 ];

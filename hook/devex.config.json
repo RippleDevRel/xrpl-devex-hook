@@ -18,5 +18,6 @@
   "prompt_max_chars": 2000,
   "output_max_chars": 1500,
   "analysis_checkpoint_hours": 2,
-  "analysis_checkpoint_min_events": 5
+  "analysis_checkpoint_min_events": 5,
+  "analysis_commit_cooldown_minutes": 30
 }

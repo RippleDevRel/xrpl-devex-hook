@@ -97,7 +97,9 @@ Prose under two pages. Specific beats vague: "the counterparty signature flow on
 
 ## Checkpoint mode
 
-When this procedure is triggered by the Stop hook checkpoint instruction (it says "XRPL DevEx checkpoint" and gives a period start), do everything above with four differences: cover only the period since the given start, skip step 4 entirely (no questions; list what you could not determine under Not observed), add `"trigger": "checkpoint"` and `"period_start": "<ISO>"` to the JSON block, and submit immediately with the `--checkpoint` flag instead of asking. Then tell the developer in one line where the report is, or that nothing in the period was worth reporting, and return to their task. Manual runs of `/xrpl-session-analysis` keep asking before submitting.
+When the instruction names a commit, the period ends at that commit: keep the `trigger`, `period_start` and `commit` values it gives in the JSON block and pass `--checkpoint --commit <hash>` to submit.mjs exactly as written.
+
+When this procedure is triggered by the Stop hook checkpoint instruction (it says "XRPL DevEx checkpoint", possibly "at commit <hash>" when a git commit closed the period, and gives a period start), do everything above with four differences: cover only the period since the given start, skip step 4 entirely (no questions; list what you could not determine under Not observed), add `"trigger": "checkpoint"` and `"period_start": "<ISO>"` to the JSON block, and submit immediately with the `--checkpoint` flag instead of asking. Then tell the developer in one line where the report is, or that nothing in the period was worth reporting, and return to their task. Manual runs of `/xrpl-session-analysis` keep asking before submitting.
 
 ## Save, show, ask once, submit
 

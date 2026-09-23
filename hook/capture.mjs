@@ -242,6 +242,15 @@ function reopenIfEnded(session, events, base, hint) {
   session.end_event_id = null;
 }
 
+// "git commit ..." whose output shows git's confirmation line "[branch hash] message".
+const COMMIT_LINE_RE = /^\[[^\]\n]+?\s+([0-9a-f]{7,40})\]\s*(.*)$/m;
+function commitFromOutput(command, output) {
+  if (!/\bgit\b[^\n;&|]*\bcommit\b/.test(String(command || ""))) return null;
+  const m = String(output || "").match(COMMIT_LINE_RE);
+  if (!m) return null;
+  return { hash: m[1].slice(0, 12), message: m[2].trim().slice(0, 80) };
+}
+
 // Our own configuration and identity files carry keys; a read of them is
 // never stored, whatever it matches.
 const OWN_FILES_RE = /devex\.config\.json|\.dev\.vars|wrangler\.toml|identity\.json|(^|[\s/\\])\.env(\.[A-Za-z0-9_-]+)?(?=$|[\s"'])/;
@@ -424,6 +433,12 @@ async function main() {
       if (session.skill_turn) break;
 
       const hay = toolHaystack(toolName, toolInput, failedEvent ? String(input.error || "") : input.tool_response);
+      // A commit made through the agent closes a period of work: remembered so
+      // the next Stop can ask for a checkpoint analysis of that period.
+      if (toolName === "Bash" && !failedEvent) {
+        const commit = commitFromOutput(toolInput.command, hay.output);
+        if (commit) session.commit_since_analysis = { ...commit, at: nowIso };
+      }
       if (toolName === "Bash" && isOwnCommand(toolInput.command, hay.output)) break;
       if (touchesOwnFiles(toolInput.command, hay.filePath)) break;
       const text = stripOwn(hay.subject) + "\n" + stripOwn(hay.output);
@@ -598,13 +613,22 @@ async function main() {
         const periodStart = [session.last_analysis_at, session.checkpoint_prompted_at, session.session_started_at].filter(Boolean).sort().at(-1);
         const hours = ageSeconds(periodStart) / 3600;
         const enough = (session.xrpl_events_since_analysis || 0) >= (Number(config.analysis_checkpoint_min_events) || 1);
-        if (hours >= checkpointHours && enough && input.stop_hook_active !== true && !session.skill_turn) {
+        const allowed = input.stop_hook_active !== true && !session.skill_turn;
+        // A commit since the last analysis closes the period early, at most one
+        // commit checkpoint per analysis_commit_cooldown_minutes; otherwise the
+        // period closes on the clock.
+        const lastAnalysis = [session.last_analysis_at, session.checkpoint_prompted_at].filter(Boolean).sort().at(-1);
+        const cooled = !lastAnalysis || ageSeconds(lastAnalysis) / 60 >= (Number(config.analysis_commit_cooldown_minutes) || 0);
+        const commit = session.commit_since_analysis || null;
+        const fire = allowed && enough && ((commit && cooled) || hours >= checkpointHours);
+        if (fire) {
           session.checkpoint_prompted_at = nowIso;
           session.checkpoint_turn = session.turn;
+          session.commit_since_analysis = null;
           stdoutJson = {
             hookSpecificOutput: {
               hookEventName: "Stop",
-              additionalContext: buildCheckpointInstruction({ sessionId, periodStart, events: session.xrpl_events_since_analysis, hours: Math.round(hours * 10) / 10, config }),
+              additionalContext: buildCheckpointInstruction({ sessionId, periodStart, events: session.xrpl_events_since_analysis, hours: Math.round(hours * 10) / 10, config, commit: commit && cooled ? commit : null }),
             },
           };
         }

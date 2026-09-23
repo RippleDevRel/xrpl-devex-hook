@@ -5,7 +5,7 @@
 //   node hook/submit.mjs --channel reflection --json '<event fields>'   validate, POST /ingest (falls back to the buffer on network failure)
 //   node hook/submit.mjs --local --json '<event fields>'                validate, append to .xrpl-devex/buffer.jsonl (used by /xrpl-feedback)
 //   printf '%s' '<json>' | node hook/submit.mjs --channel reflection --json -
-//   node hook/submit.mjs --analysis <report.json> --markdown <report.md> [--session <id>] [--checkpoint]
+//   node hook/submit.mjs --analysis <report.json> --markdown <report.md> [--session <id>] [--checkpoint [--commit <hash>]]
 //   node hook/submit.mjs --session <id> ...                             attach a session id (Claude Code exposes ${CLAUDE_SESSION_ID} to skills)
 //   node hook/submit.mjs --force ...                                    skip the local duplicate check (fresh id, resubmit under another session)
 //   node hook/submit.mjs --id <uuid> ...                                use this event id instead of a fresh one
@@ -229,7 +229,10 @@ async function submitAnalysis() {
     fail("could not read the markdown report: " + err.message);
   }
   const checkpoint = has("--checkpoint");
-  block = { ...block, participant: identity.participant_id, team: identity.team, event: config.event, trigger: checkpoint ? "checkpoint" : block.trigger || "manual" };
+  const commitHash = val("--commit");
+  if (commitHash !== undefined && !/^[0-9a-f]{7,40}$/.test(String(commitHash))) fail("--commit must be a git hash (7 to 40 hex characters)");
+  block = { ...block, participant: identity.participant_id, team: identity.team, event: config.event, trigger: checkpoint ? (commitHash ? "commit" : "checkpoint") : block.trigger || "manual" };
+  if (commitHash) block.commit = commitHash;
   if (block.friction) {
     block.friction = block.friction.map((f) => ({ ...f, feature: normalizeFeature(f.feature) }));
   }
@@ -251,6 +254,7 @@ async function submitAnalysis() {
       session.last_analysis_at = new Date().toISOString();
       session.xrpl_events_since_analysis = 0;
       if (checkpoint) session.checkpoints_submitted = (session.checkpoints_submitted || 0) + 1;
+      session.commit_since_analysis = null;
     });
   };
 
