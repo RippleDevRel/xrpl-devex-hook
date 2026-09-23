@@ -4,7 +4,7 @@
 import crypto from "node:crypto";
 import { redactDeep } from "./redact.mjs";
 
-const NULLABLE = ["session_id", "feature", "tx_type", "result_code", "attempts", "elapsed_seconds", "failed", "tool_name", "text", "summary", "payload"];
+const NULLABLE = ["session_id", "feature", "tx_type", "result_code", "attempts", "elapsed_seconds", "failed", "tool_name", "text", "summary", "payload", "author", "agent", "tx_hash"];
 
 export function makeEvent({ identity, config, channel, kind, session_id = null, ts = null, ...fields }) {
   const ev = {
@@ -29,6 +29,11 @@ export function makeEvent({ identity, config, channel, kind, session_id = null, 
     text: fields.text ?? null,
     summary: fields.summary ?? null,
     payload: fields.payload ?? null,
+    author: fields.author ?? null,
+    // which coding agent produced the row, and the first validated hash when a
+    // transaction result was captured (public, kept for on-chain verification)
+    agent: fields.agent ?? null,
+    tx_hash: fields.tx_hash ?? null,
   };
   for (const k of NULLABLE) if (ev[k] === undefined) ev[k] = null;
   return ev;
@@ -41,6 +46,8 @@ export function redactEvent(ev) {
   out.text = redactDeep(ev.text, found);
   out.summary = redactDeep(ev.summary, found);
   out.payload = redactDeep(ev.payload, found);
+  // validated transaction hashes extracted on purpose are public and kept
+  if (ev.payload && Array.isArray(ev.payload.tx_hashes)) out.payload = { ...out.payload, tx_hashes: ev.payload.tx_hashes.slice() };
   if (found.size) {
     out.payload = { ...(out.payload && typeof out.payload === "object" ? out.payload : {}), redacted: [...found] };
   }

@@ -26,6 +26,7 @@ agent-instruction.md    what your agent reads to install this
 INSTALL.md              full install guide, per agent, human and agent readable
 hook/                   the scripts: setup, capture, submit, status, reflection, allowlist, per-agent stop hooks
 skills/                 /xrpl-setup, /xrpl-status, /xrpl-feedback, /xrpl-session-analysis and the installer
+scripts/                precommit-secrets.mjs, the optional pre-commit guard (bash skills/install.sh --git-hook)
 docs/                   PARTICIPANT.md, PRIVACY.md, TAXONOMY.md
 ```
 
@@ -33,4 +34,4 @@ Requires Node 18 or newer. No npm install, no API key, no token setup.
 
 ## For organizers
 
-This repo is generated from the reference repo https://github.com/RippleDevRel/xrpl-devex-capture.git (Worker, D1 schema, organizer export and report tooling, tests) by `scripts/sync-participant-repo.sh`. Do not edit files here: change the reference repo, run the sync, commit here. Version 2.4.0.
+This repo is generated from the reference repo https://github.com/RippleDevRel/xrpl-devex-capture.git (Worker, D1 schema, organizer export and report tooling, tests) by `scripts/sync-participant-repo.sh`. Do not edit files here: change the reference repo, run the sync, commit here. Version 2.5.0.

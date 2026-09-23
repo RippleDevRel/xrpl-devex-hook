@@ -6,6 +6,33 @@
 
 export const SURFACES = ["protocol", "docs", "sdk", "infra", "tooling", "unknown"];
 
+// Words agents and developers use for a surface; submit.mjs maps them before validation.
+export const SURFACE_ALIASES = {
+  ledger: "protocol",
+  rippled: "protocol",
+  node: "protocol",
+  documentation: "docs",
+  doc: "docs",
+  library: "sdk",
+  client: "sdk",
+  network: "infra",
+  faucet: "infra",
+  devnet: "infra",
+  tool: "tooling",
+  tools: "tooling",
+};
+
+// Canonical surface for a typed value, or null when neither a surface nor an alias.
+export function canonicalSurface(value) {
+  if (typeof value !== "string") return null;
+  const key = value.trim().toLowerCase();
+  if (SURFACES.includes(key)) return key;
+  return SURFACE_ALIASES[key] || null;
+}
+
+// Who wrote a classified row: the agent (reflections) or the participant (feedback, analyses).
+export const AUTHORS = ["agent", "participant"];
+
 export const FRICTION_TYPES = [
   "retry_loop",
   "doc_gap",
@@ -118,6 +145,7 @@ export function validateEvent(ev) {
     if (ev[k] !== undefined && ev[k] !== null && !(Number.isInteger(ev[k]) && ev[k] >= 0)) errors.push(`${k} must be a non-negative integer or null`);
   }
   if (ev.failed !== undefined && ev.failed !== null && ![0, 1, true, false].includes(ev.failed)) errors.push("failed must be 0, 1 or a boolean");
+  if (ev.author !== undefined && ev.author !== null && !AUTHORS.includes(ev.author)) errors.push(`author must be one of ${AUTHORS.join(", ")} or null`);
 
   if (typeof ev.text === "string") {
     if (ev.text.length > LIMITS.text_max) errors.push(`text must be at most ${LIMITS.text_max} characters`);

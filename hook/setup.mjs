@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-// First-run setup: consent, team name, pseudonym, hook registration.
+// First-run setup: consent, team name, pseudonym, hook registration, self-test.
 //
 //   node hook/setup.mjs                      interactive
 //   TEAM_NAME="zetlar" CONSENT=yes node hook/setup.mjs --non-interactive
 //   CONSENT=no node hook/setup.mjs --non-interactive        records the refusal
 //   node hook/setup.mjs --emit-hooks         print registrations, absolute paths
 //   node hook/setup.mjs --emit-hooks --agent claude-code --json
-//   node hook/setup.mjs --register               project hooks for the agent detected from the environment
+//   node hook/setup.mjs --register               project hooks for every agent detected (environment markers
+//                                                or a .claude, .cursor, .codex, .grok, .github/hooks folder)
 //   node hook/setup.mjs --register grok          one agent (claude-code, cursor, codex, grok, vscode-copilot)
 //   node hook/setup.mjs --register all           every supported agent
+//   node hook/setup.mjs --register --agents claude-code,codex   an explicit list
 //   node hook/setup.mjs --non-interactive --agent cursor   consent plus registration for one agent
 //   node hook/setup.mjs --unregister             remove every project hook this setup wrote
 //
@@ -17,9 +19,18 @@
 // the dedicated Grok and Copilot files are added to the project .gitignore.
 //   node hook/setup.mjs --show-consent
 //   node hook/setup.mjs --check-invite           prints { reachable, invite_only } from the Worker's /health
-//   INVITE_CODE=... node hook/setup.mjs --non-interactive ...   or --invite-code <code>: verified and stored locally
+//   node hook/setup.mjs --non-interactive --invite <code> ...   the event invite code, verified and stored locally
+//                                                (also --invite-code <code> or INVITE_CODE in the environment)
 //   node hook/setup.mjs --invite <code>          set or replace the invite code after setup
-//   node hook/setup.mjs --project /path/to/project   (default: CLAUDE_PROJECT_DIR or cwd)
+//   node hook/setup.mjs --project /path/to/project   (default: the nearest project root above the cwd)
+//
+// The project root is resolved by hook/lib/paths.mjs (walk up to .xrpl-devex/
+// or an agent config folder). Running from inside the clone of this tool is
+// refused unless --project names the real project (T05).
+//
+// Every consent or registration ends with a self-test: one synthetic event
+// goes through capture.mjs into the buffer and, when the endpoint is
+// configured, is flushed, so "success" means an event actually got out (T06).
 //
 // Writes .xrpl-devex/identity.json: { participant_id, team, team_display,
 // consented_at, client_version, invite_code?, invite_only } or { declined: true }.
@@ -32,10 +43,12 @@ import path from "node:path";
 import readline from "node:readline";
 import { loadConfig, isConfigured } from "./lib/config.mjs";
 import { consentText } from "./lib/consent.mjs";
-import { projectDir, dataPaths, HOOK_DIR, REPO_DIR, fwd } from "./lib/paths.mjs";
+import { projectDir, dataPaths, HOOK_DIR, fwd } from "./lib/paths.mjs";
 import { loadIdentity, saveIdentity, createIdentity, declinedIdentity, normalizeTeam, isActive } from "./lib/identity.mjs";
 import { getJson, postJson } from "./lib/net.mjs";
+import { countJsonl, flushBuffer } from "./lib/buffer.mjs";
 import { claudeCodeHooks, cursorHooks, grokHooks, codexHooks, codexToml, vscodeHooks, mergeClaudeSettings, mergeCodexSettings, mergeCursorSettings, removeClaudeSettings, removeCursorSettings } from "./lib/registrations.mjs";
+import { PROJECT_AGENTS, runningAgents, presentAgents, normalizeAgentName, skillsInstallCommand } from "./lib/install.mjs";
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -47,6 +60,7 @@ const val = (f) => {
 };
 
 if (val("--project")) process.env.XRPL_DEVEX_PROJECT_DIR = path.resolve(val("--project"));
+const explicitProject = Boolean(process.env.XRPL_DEVEX_PROJECT_DIR);
 const project = projectDir();
 const config = loadConfig();
 
@@ -56,6 +70,20 @@ process.stdout.on("error", () => {});
 
 function out(s = "") {
   process.stdout.write(s + "\n");
+}
+
+// The clone of this tool holds hook/capture.mjs next to hook/devex.config.json.
+function isHookClone(dir) {
+  return fs.existsSync(path.join(dir, "hook", "capture.mjs")) && fs.existsSync(path.join(dir, "hook", "devex.config.json"));
+}
+
+// A setup run from inside the clone registered the hooks against itself (T05).
+function refuseHookClone() {
+  if (explicitProject || !isHookClone(project)) return;
+  process.stderr.write(
+    `${project} is the capture tool's own clone, not your project. Run the setup from your project root (the folder that holds your agent's .claude, .cursor or .codex directory), or pass --project <dir>. Nothing was changed.\n`,
+  );
+  process.exit(1);
 }
 
 // Adds lines to the project .gitignore when missing. Returns the lines added.
@@ -74,24 +102,14 @@ function ensureGitignore(lines = [".xrpl-devex/"]) {
   }
 }
 
-// Which agent is running this setup. Explicit --agent or XRPL_DEVEX_AGENT wins
-// (comma separated, or "all"); otherwise environment markers set by each agent.
-const AGENT_ENV_MARKERS = [
-  ["claude-code", ["CLAUDECODE", "CLAUDE_PROJECT_DIR", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_SESSION_ID"]],
-  ["cursor", ["CURSOR_AGENT", "CURSOR_TRACE_ID", "CURSOR_WORKSPACE_ROOTS"]],
-  ["codex", ["CODEX_SANDBOX", "CODEX_THREAD_ID", "CODEX_HOME"]],
-  ["grok", ["GROK_WORKSPACE_ROOT", "GROK_SESSION_ID", "GROK_HOME"]],
-  ["vscode-copilot", ["COPILOT_AGENT", "COPILOT_SESSION_ID", "GITHUB_COPILOT_CLI"]],
-];
-
+// Every agent that is running this setup or has a config folder in the project.
 function detectAgents() {
-  return AGENT_ENV_MARKERS.filter(([, vars]) => vars.some((v) => process.env[v])).map(([name]) => name);
+  const found = new Set([...runningAgents(), ...presentAgents(project)]);
+  return PROJECT_AGENTS.filter((a) => found.has(a));
 }
 
-function normalizeAgentName(n) {
-  return n === "copilot" || n === "vscode" ? "vscode-copilot" : n === "claude" ? "claude-code" : n;
-}
-
+// Explicit --agent/--agents or XRPL_DEVEX_AGENT wins (comma separated, or
+// "all"); otherwise every detected agent.
 function requestedAgents(explicit) {
   const raw = explicit || process.env.XRPL_DEVEX_AGENT || "";
   if (raw.trim()) {
@@ -100,6 +118,8 @@ function requestedAgents(explicit) {
   }
   return detectAgents();
 }
+
+const agentFlag = () => val("--agent") || val("--agents");
 
 function emitHooks({ agent, asJson }) {
   const all = {
@@ -152,14 +172,42 @@ async function verifyInvite(code) {
   return { ok: false, error: r.error || "network error", network: true };
 }
 
-// Resolves the invite code for a consent: verified when the Worker is reachable.
-// Returns { code, invite_only } or exits with a message the agent can relay.
+// Asks for the code on the terminal, verifying each try; exits after three
+// refusals. Returns the accepted code.
+async function promptInvite(ask, current) {
+  out("");
+  out("This event requires an invite code, handed out by the organizer.");
+  for (let tries = 0; tries < 3; tries++) {
+    const typed = (await ask(`Invite code${current ? ` [${current}]` : ""}: `)).trim() || current;
+    if (!typed) continue;
+    const v = await verifyInvite(typed);
+    if (v.ok || v.network) {
+      if (v.network) out(`Could not verify now (${v.error}); stored and checked at the first flush.`);
+      return typed;
+    }
+    out(`Refused by the server (${v.error}). Try again.`);
+  }
+  process.stderr.write("No valid invite code. Nothing was changed.\n");
+  process.exit(1);
+}
+
+// Resolves the invite code for a consent: verified when the Worker is reachable,
+// asked for on the terminal when required and missing. Returns
+// { code, invite_only } or exits with a message the agent can relay.
 async function resolveInvite(existing, provided) {
   const status = await inviteStatus();
   const code = String(provided || (existing && existing.invite_code) || "").trim();
   if (status.invite_only && !code) {
-    process.stderr.write("This event requires an invite code. Ask the developer for the code handed out at the event, then pass it with --invite-code <code> or INVITE_CODE=<code>. Nothing was changed.\n");
-    process.exit(1);
+    if (!process.stdin.isTTY) {
+      process.stderr.write("This event requires an invite code. Ask the developer for the code handed out at the event, then pass it with --invite <code>. Nothing was changed.\n");
+      process.exit(1);
+    }
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      return { code: await promptInvite((q) => new Promise((resolve) => rl.question(q, resolve)), ""), invite_only: true };
+    } finally {
+      rl.close();
+    }
   }
   if (code && status.reachable) {
     const v = await verifyInvite(code);
@@ -211,10 +259,7 @@ function registerDedicated(file, body, remove) {
 function registerClaude(remove) {
   const local = path.join(project, ".claude", "settings.local.json");
   const shared = path.join(project, ".claude", "settings.json");
-  if (remove && fs.existsSync(shared) && fs.readFileSync(shared, "utf8").includes("capture.mjs")) {
-    registerMerged(shared, mergeClaudeSettings, true);
-  }
-  if (!remove && fs.existsSync(shared) && fs.readFileSync(shared, "utf8").includes("capture.mjs")) {
+  if (fs.existsSync(shared) && fs.readFileSync(shared, "utf8").includes("capture.mjs")) {
     registerMerged(shared, mergeClaudeSettings, true);
   }
   return registerMerged(local, mergeClaudeSettings, remove);
@@ -222,21 +267,22 @@ function registerClaude(remove) {
 
 const REGISTERED_AGENTS = {
   "claude-code": (remove) => registerClaude(remove),
-  grok: (remove) =>
-    registerDedicated(path.join(project, ".grok", "hooks", "xrpl-devex.json"), grokHooks(), remove),
-  codex: (remove) =>
-    registerMerged(path.join(project, ".codex", "hooks.json"), mergeCodexSettings, remove),
-  cursor: (remove) =>
-    registerMerged(path.join(project, ".cursor", "hooks.json"), mergeCursorSettings, remove, removeCursorSettings),
-  "vscode-copilot": (remove) =>
-    registerDedicated(path.join(project, ".github", "hooks", "xrpl-devex.json"), vscodeHooks(), remove),
+  grok: (remove) => registerDedicated(path.join(project, ".grok", "hooks", "xrpl-devex.json"), grokHooks(), remove),
+  codex: (remove) => registerMerged(path.join(project, ".codex", "hooks.json"), mergeCodexSettings, remove),
+  cursor: (remove) => registerMerged(path.join(project, ".cursor", "hooks.json"), mergeCursorSettings, remove, removeCursorSettings),
+  "vscode-copilot": (remove) => registerDedicated(path.join(project, ".github", "hooks", "xrpl-devex.json"), vscodeHooks(), remove),
 };
 
-const PROJECT_AGENTS = Object.keys(REGISTERED_AGENTS);
 // Files we own outright, safe to ignore in git. Merged files (.codex/hooks.json,
 // .cursor/hooks.json) may hold the participant's own hooks, so we only warn.
 const IGNORABLE = { "claude-code": ".claude/settings.local.json", grok: ".grok/hooks/xrpl-devex.json", "vscode-copilot": ".github/hooks/xrpl-devex.json" };
 const MERGED = { codex: ".codex/hooks.json", cursor: ".cursor/hooks.json" };
+
+const TRUST_NOTE =
+  "Before anything is captured, the agent must load and trust the new hooks, which only happens in a new session: restart the agent (or start a new session) in this project. " +
+  "Claude Code asks whether to trust the files in the folder when the project is opened and loads .claude/settings.local.json at session start; " +
+  "Codex and Cursor show a prompt to review and approve the project hooks in .codex/hooks.json or .cursor/hooks.json the first time they see them; Grok needs /hooks-trust. " +
+  "Then run node hook/status.mjs (or /xrpl-status) and check that it says Capturing: yes.";
 
 function registerAgents(names, remove) {
   for (const name of names) {
@@ -254,33 +300,66 @@ function registerAgents(names, remove) {
     if (added.length) out(`Added to the project .gitignore: ${added.join(", ")}`);
     const merged = names.map((n) => MERGED[n]).filter(Boolean);
     if (merged.length) out(`Note: ${merged.join(" and ")} now contain absolute local paths. Keep them out of git, or have each teammate run --register on their machine.`);
-    out("Trust the project hooks before they run: /hooks in Claude Code, Codex and Cursor, /hooks-trust in Grok.");
+    out(TRUST_NOTE);
   }
 }
 
+// install.sh through bash, or install.ps1 through PowerShell on Windows.
 function installSkills() {
-  const sh = path.join(REPO_DIR, "skills", "install.sh");
-  const r = spawnSync("bash", [sh, "--project", project], { encoding: "utf8" });
-  if (r.status !== 0) {
-    out("Skills were not installed. Run: bash skills/install.sh --project " + project);
-    if (r.stderr) out(r.stderr.trim());
+  const c = skillsInstallCommand(project);
+  const r = spawnSync(c.cmd, c.args, { encoding: "utf8", timeout: 60000 });
+  if (r.error || r.status !== 0) {
+    out(`Skills were not installed. Run: ${c.display}`);
+    if (r.error) out(r.error.message);
+    else if (r.stderr) out(r.stderr.trim());
     return;
   }
   if (r.stdout) out(r.stdout.trim());
 }
 
-function enableProject() {
-  const agents = requestedAgents(val("--agent"));
+// One synthetic prompt through capture.mjs, the path every hook takes, then a
+// count of what reached the buffer and a flush when the endpoint is configured.
+// Network trouble is reported, never fatal: the event stays buffered.
+async function selfTest(identity) {
+  const p = dataPaths();
+  const before = countJsonl(p.buffer);
+  const input = { session_id: "setup-self-test", hook_event_name: "UserPromptSubmit", cwd: project, prompt: "XRPL DevEx Capture self-test: is the xrpl hook installed?" };
+  const r = spawnSync(process.execPath, [path.join(HOOK_DIR, "capture.mjs"), "--event", "UserPromptSubmit"], {
+    input: JSON.stringify(input),
+    env: { ...process.env, XRPL_DEVEX_PROJECT_DIR: project },
+    encoding: "utf8",
+    timeout: 15000,
+  });
+  const written = countJsonl(p.buffer) - before;
+  if (written < 1) {
+    out(`Self-test: FAILED, capture.mjs wrote nothing to ${p.buffer}${r.error ? ` (${r.error.message})` : ""}. Check ${p.debugLog} and run node hook/status.mjs.`);
+    return;
+  }
+  if (!isConfigured(config)) {
+    out(`Self-test: ${written} event written to ${p.buffer}; it stays local until the organizer configures the endpoint in hook/devex.config.json.`);
+    return;
+  }
+  const f = await flushBuffer({ config, identity, hint: project });
+  if (f.ok) out(`Self-test: ${written} event written to ${p.buffer}, sent ${f.sent} to ${config.endpoint}.`);
+  else out(`Self-test: ${written} event written to ${p.buffer}, could not send it now (${f.error}); it stays buffered and goes out at the next flush.`);
+}
+
+async function selfTestIfActive() {
+  const identity = loadIdentity();
+  if (isActive(identity)) await selfTest(identity);
+}
+
+function enableProject(agents) {
   if (agents.length) {
     registerAgents(agents, false);
   } else {
-    out("No coding agent detected from the environment, so no hook file was written.");
+    out(`No coding agent detected: no agent marker in the environment and no .claude, .cursor, .codex, .grok or .github/hooks folder in ${project}, so no hook file was written.`);
     out(`Register the agent you use: node hook/setup.mjs --register <${PROJECT_AGENTS.join("|")}>   (or --register all)`);
   }
   installSkills();
 }
 
-function finish(identity) {
+async function finish(identity, agents) {
   const p = dataPaths();
   out("");
   if (identity.declined) {
@@ -293,7 +372,9 @@ function finish(identity) {
   if (ensureGitignore().length) out("Added .xrpl-devex/ to the project .gitignore.");
   if (!isConfigured(config)) out("Note: hook/devex.config.json still has REPLACE-ME values. Events will buffer locally until the organizer fills in endpoint and ingest_key.");
   out("");
-  enableProject();
+  enableProject(agents);
+  out("");
+  await selfTest(identity);
   out("");
   out("Check with: node hook/status.mjs");
   out("Disable with: node hook/setup.mjs --unregister");
@@ -304,7 +385,7 @@ async function nonInteractive() {
   const existing = loadIdentity();
   if (["no", "n", "false", "0", "decline", "declined"].includes(consent)) {
     saveIdentity(declinedIdentity());
-    finish({ declined: true });
+    await finish({ declined: true });
     return;
   }
   if (!["yes", "y", "true", "1", "accept", "accepted"].includes(consent)) {
@@ -318,11 +399,11 @@ async function nonInteractive() {
   }
   const identity = createIdentity({ teamDisplay, pseudonym: isActive(existing) ? existing.participant_id : undefined });
   if (isActive(existing)) identity.consented_at = existing.consented_at;
-  const invite = await resolveInvite(existing, val("--invite-code") || process.env.INVITE_CODE);
+  const invite = await resolveInvite(existing, val("--invite") || val("--invite-code") || process.env.INVITE_CODE);
   if (invite.code) identity.invite_code = invite.code;
   identity.invite_only = invite.invite_only;
   saveIdentity(identity);
-  finish(identity);
+  await finish(identity, requestedAgents(agentFlag()));
 }
 
 // Sets or replaces the invite code on an existing identity.
@@ -359,7 +440,7 @@ async function interactive() {
   if (answer.startsWith("n")) {
     rl.close();
     saveIdentity(declinedIdentity());
-    finish({ declined: true });
+    await finish({ declined: true });
     return;
   }
   let teamDisplay = "";
@@ -367,70 +448,58 @@ async function interactive() {
     const def = existing && existing.team_display ? ` [${existing.team_display}]` : "";
     teamDisplay = (await ask(`Team name${def}: `)).trim() || (existing && existing.team_display) || "";
   }
-  const status = await inviteStatus();
-  let code = (existing && existing.invite_code) || "";
-  if (status.invite_only) {
-    out("");
-    out("This event requires an invite code, handed out by the organizer.");
-    for (let tries = 0; tries < 3; tries++) {
-      const typed = (await ask(`Invite code${code ? ` [${code}]` : ""}: `)).trim() || code;
-      if (!typed) continue;
-      const v = await verifyInvite(typed);
-      if (v.ok || v.network) {
-        code = typed;
-        if (v.network) out(`Could not verify now (${v.error}); stored and checked at the first flush.`);
-        break;
-      }
-      out(`Refused by the server (${v.error}). Try again.`);
-      if (tries === 2) {
-        rl.close();
-        process.stderr.write("No valid invite code. Nothing was changed.\n");
-        process.exit(1);
-      }
-    }
+  // Every detected agent is registered; the participant only deselects.
+  let agents = requestedAgents(agentFlag());
+  if (!agentFlag() && agents.length) {
+    const typed = (await ask(`Register hooks for: ${agents.join(", ")} [Enter to keep all, or type the ones to keep]: `)).trim();
+    if (typed) agents = requestedAgents(typed);
   }
+  const status = await inviteStatus();
+  let code = val("--invite") || (existing && existing.invite_code) || "";
+  if (status.invite_only) code = await promptInvite(ask, code);
   rl.close();
   const identity = createIdentity({ teamDisplay, pseudonym: isActive(existing) ? existing.participant_id : undefined });
   if (isActive(existing)) identity.consented_at = existing.consented_at;
   if (code) identity.invite_code = code;
   identity.invite_only = status.invite_only;
   saveIdentity(identity);
-  finish(identity);
+  await finish(identity, agents);
+}
+
+function fail(err) {
+  process.stderr.write(String((err && err.message) || err) + "\n");
+  process.exit(1);
 }
 
 if (has("--show-consent")) {
   out(consentText(config));
 } else if (has("--check-invite")) {
   inviteStatus().then((s) => out(JSON.stringify({ endpoint: isConfigured(config) ? config.endpoint : null, ...s })));
-} else if (has("--invite")) {
-  setInvite(val("--invite")).catch((err) => {
-    process.stderr.write(String((err && err.message) || err) + "\n");
-    process.exit(1);
-  });
 } else if (has("--emit-hooks")) {
   emitHooks({ agent: val("--agent"), asJson: has("--json") });
 } else if (has("--unregister")) {
   const names = val("--unregister") ? requestedAgents(val("--unregister")) : PROJECT_AGENTS.slice();
   registerAgents(names, true);
 } else if (has("--register")) {
-  const names = requestedAgents(val("--register") || val("--agent"));
+  refuseHookClone();
+  const names = requestedAgents(val("--register") || agentFlag());
   if (!names.length) {
     process.stderr.write(`No coding agent detected. Name it: node hook/setup.mjs --register <${PROJECT_AGENTS.join("|")}|all>\n`);
     process.exit(1);
   }
   registerAgents(names, false);
   installSkills();
+  selfTestIfActive().catch(fail);
 } else if (has("--non-interactive")) {
-  nonInteractive().catch((err) => {
-    process.stderr.write(String((err && err.message) || err) + "\n");
-    process.exit(1);
-  });
+  refuseHookClone();
+  nonInteractive().catch(fail);
+} else if (has("--invite")) {
+  refuseHookClone();
+  setInvite(val("--invite")).catch(fail);
 } else if (!process.stdin.isTTY) {
   process.stderr.write("No TTY. Use --non-interactive with TEAM_NAME and CONSENT=yes|no after showing the consent text (--show-consent).\n");
   process.exit(1);
 } else {
-  interactive().catch((err) => {
-    process.stderr.write(String(err && err.message ? err.message : err) + "\n");
-    process.exit(1);
-  });
+  refuseHookClone();
+  interactive().catch(fail);
 }

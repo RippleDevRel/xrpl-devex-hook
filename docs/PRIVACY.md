@@ -43,7 +43,17 @@ Some events are invite only. The code the organizer hands out is stored in the s
 
 ## Redaction
 
-`hook/lib/redact.mjs` runs on every event before it is buffered (`capture.mjs`) and again before anything is sent (`submit.mjs`). It replaces with `[redacted:<type>]`: XRPL family seeds (`s` plus 28 to 30 base58 characters, and `sEd` prefixed), 64 hex character strings (raw private keys; transaction hashes have the same shape and are redacted too in hook captures), `Bearer <token>` values, and the value of anything matching `KEY=`, `TOKEN=`, `SECRET=`, `PASSWORD=`, `SEED=`, `PRIVATE=`. Ledger addresses (`r...`) are kept: they are public and useful. The session analysis skill does a fuller manual redaction pass and lists what it removed in `redacted`.
+`hook/lib/redact.mjs` runs on every event before it is buffered (`capture.mjs`) and again before anything is sent (`submit.mjs`). It replaces with `[redacted:<type>]`: XRPL family seeds (`s` plus 28 to 30 base58 characters, and `sEd` prefixed), 64 hex character strings (raw private keys; transaction hashes have the same shape and are redacted too in hook captures), `Bearer <token>` values, and the value of anything matching `KEY=`, `TOKEN=`, `SECRET=`, `PASSWORD=`, `SEED=`, `PRIVATE=`, `MNEMONIC=`, `PASSPHRASE=`, in env, JSON, YAML and TOML forms. The session analysis skill does a fuller manual redaction pass and lists what it removed in `redacted`.
+
+### Addresses and hashes: what is kept
+
+- Ledger addresses (`r...`) are kept as is. They are public, pseudonymous, and needed to tell two wallets apart in a report. The 674 address-bearing rows of the first event were kept by design and stay that way.
+- 64 hex character strings inside tool output stay redacted. A raw private key and a transaction hash have the same shape, and the hook cannot tell them apart in free text, so the safe side wins even though it removed about 1500 transaction hashes at the first event.
+- Transaction hashes that the capture extracts on purpose are kept: when a Bash output prints a validated transaction result, the hook reads the hash next to `engine_result` or `TransactionResult` and stores it in the payload field `tx_hashes`. A validated hash is public on the ledger and lets organizers verify a hook row against the chain. Only that field carries hashes; `text` and `summary` never do.
+
+### Pre-commit guard for participants
+
+`scripts/precommit-secrets.mjs` runs the same redactor over the files about to be committed and exits 1 when anything would be redacted, printing file and line but never the value. Install it in a project with `bash skills/install.sh --git-hook` (it writes `.git/hooks/pre-commit`; an existing hook that is not ours is left alone with a message) or run it by hand: `node scripts/precommit-secrets.mjs [paths]`. It skips binary files and `devex.config.json`, whose ingest key ships in the participant repo by design. This guard protects the team's own repository, not the capture data: at the first event, live seeds pasted into a public README were caught only by a manual `git grep`.
 
 ## Where the data goes
 

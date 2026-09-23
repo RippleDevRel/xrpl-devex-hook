@@ -4,7 +4,7 @@
 // full v2 hook set for Claude Code.
 
 import path from "node:path";
-import { HOOK_DIR, fwd } from "./paths.mjs";
+import { HOOK_DIR, fwd, platform } from "./paths.mjs";
 
 export const MARKER = "xrpl-devex-capture";
 
@@ -76,22 +76,25 @@ function cursorCmd(rel, extra = [], timeout = 10) {
 }
 
 export function cursorHooks() {
+  // Windows: Cursor's PowerShell pipeline drops stdin for wrapper scripts, so
+  // the registration points at the Node wrapper that inherits stdio.
+  const cap = platform() === "win32" ? "agents/cursor/capture.mjs" : "capture.mjs";
   return {
     version: 1,
     hooks: {
-      sessionStart: [cursorCmd("capture.mjs", ["--event", "SessionStart"])],
-      beforeSubmitPrompt: [cursorCmd("capture.mjs", ["--event", "UserPromptSubmit"])],
+      sessionStart: [cursorCmd(cap, ["--event", "SessionStart"])],
+      beforeSubmitPrompt: [cursorCmd(cap, ["--event", "UserPromptSubmit"])],
       afterShellExecution: [
-        cursorCmd("capture.mjs", ["--event", "PostToolUse"]),
-        cursorCmd("capture.mjs", ["--event", "PostToolUse", "--package-install"]),
+        cursorCmd(cap, ["--event", "PostToolUse"]),
+        cursorCmd(cap, ["--event", "PostToolUse", "--package-install"]),
       ],
-      afterMCPExecution: [cursorCmd("capture.mjs", ["--event", "PostToolUse"])],
-      afterFileEdit: [cursorCmd("capture.mjs", ["--event", "PostToolUse"])],
-      postToolUseFailure: [cursorCmd("capture.mjs", ["--event", "PostToolUseFailure"])],
-      preCompact: [cursorCmd("capture.mjs", ["--event", "PreCompact"])],
-      sessionEnd: [cursorCmd("capture.mjs", ["--event", "SessionEnd"], 10)],
+      afterMCPExecution: [cursorCmd(cap, ["--event", "PostToolUse"])],
+      afterFileEdit: [cursorCmd(cap, ["--event", "PostToolUse"])],
+      postToolUseFailure: [cursorCmd(cap, ["--event", "PostToolUseFailure"])],
+      preCompact: [cursorCmd(cap, ["--event", "PreCompact"])],
+      sessionEnd: [cursorCmd(cap, ["--event", "SessionEnd"], 10)],
       stop: [
-        cursorCmd("capture.mjs", ["--event", "Stop"], 20),
+        cursorCmd(cap, ["--event", "Stop"], 20),
         { command: `node "${abs("agents/cursor/stop-hook.mjs")}"`, timeout: 15, loop_limit: 2 },
       ],
     },

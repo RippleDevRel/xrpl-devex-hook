@@ -9,6 +9,9 @@
 //           hashes have the same shape and are redacted too in hook captures)
 //   bearer  "Bearer <token>" authorization values
 //   env     KEY=, TOKEN=, SECRET= style assignments (value only)
+//   pem     PEM private key blocks
+//   jwt     JSON web tokens (three base64url segments starting with eyJ)
+//   token   GitHub (ghp_, gho_, ghu_, ghs_, ghr_) and AWS access key ids
 //
 // Kept on purpose: ledger addresses (r... 25 to 35 base58 chars) and
 // transaction hashes shorter or longer than exactly 64 hex characters.
@@ -19,9 +22,25 @@ const BASE58 = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz";
 // once as env, then bearer, then seeds, then bare hex.
 const RULES = [
   {
+    // KEY=value, key: value, "key": "value", 'key': 'value' (JSON, YAML, TOML, env)
     type: "env",
-    re: /\b([A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|SEED|PRIVATE)[A-Za-z0-9_]*)(\s*[=:]\s*)("[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
+    re: /\b([A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|SEED|PRIVATE|MNEMONIC|PASSPHRASE)[A-Za-z0-9_]*)(["']?\s*[=:]\s*)("[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
     replace: (_m, name, sep) => `${name}${sep}[redacted:env]`,
+  },
+  {
+    type: "pem",
+    re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+    replace: () => "[redacted:pem]",
+  },
+  {
+    type: "jwt",
+    re: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+    replace: () => "[redacted:jwt]",
+  },
+  {
+    type: "token",
+    re: /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})\b/g,
+    replace: () => "[redacted:token]",
   },
   {
     type: "bearer",

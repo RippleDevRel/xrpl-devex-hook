@@ -1,5 +1,5 @@
 {
-  "_comment": "Reference only. Prefer `node hook/setup.mjs --register cursor` (or `--register` for every agent). Cursor uses version 1 and a flat command list. Keep loop_limit on stop.",
+  "_comment": "Reference only. Prefer `node hook/setup.mjs --register cursor` (or `--register` for every agent). Cursor uses version 1 and a flat command list. Keep loop_limit on stop. On Windows point the commands at hook/agents/cursor/capture.mjs (a Node wrapper that inherits stdin, which Cursor's PowerShell pipeline drops for .cmd wrappers).",
   "version": 1,
   "hooks": {
     "sessionStart": [{ "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event SessionStart", "timeout": 10 }],

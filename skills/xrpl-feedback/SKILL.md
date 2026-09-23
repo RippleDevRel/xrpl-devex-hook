@@ -21,6 +21,8 @@ surface (where the friction sits):
 - `tooling` the local environment for this event (starter repo, XRPL AI Starter Kit, MPP SDK, this capture system, Claude Code, env setup)
 - `unknown` truly ambiguous
 
+Aliases are accepted by submit.mjs and mapped before validation: `ledger`, `rippled`, `node` become `protocol`; `documentation`, `doc` become `docs`; `library`, `client` become `sdk`; `network`, `faucet`, `devnet` become `infra`; `tool`, `tools` become `tooling`. Anything else is rejected with the valid list printed; use a value from the list above.
+
 friction_type (what kind of friction):
 - `retry_loop` same operation attempted 2+ times before success
 - `doc_gap` a question the docs should have answered
@@ -46,7 +48,7 @@ Never hand-write the buffer file. Find the repo (`./hook/submit.mjs`, else `find
 node <repo>/hook/submit.mjs --local --channel feedback --session "${CLAUDE_SESSION_ID}" --json '{"surface":"...","friction_type":"...","feature":null,"tx_type":null,"result_code":null,"summary":"...","text":"...","payload":{"original_text":"<only when translated>"}}'
 ```
 
-Omit `payload` when the developer already wrote in English.
+Omit `payload` when the developer already wrote in English. submit.mjs tags the row `author: "participant"` because the developer typed it (reflections written by the agent are tagged `author: "agent"`); do not pass the field yourself.
 
 If the text contains single quotes, pipe it instead: `printf '%s' '<json>' | node <repo>/hook/submit.mjs --local --channel feedback --session "${CLAUDE_SESSION_ID}" --json -`
 

@@ -47,6 +47,7 @@ export function buildInstruction({ submitPath, sessionId = null, signal = null, 
     `Event focus features: ${focus}. Any XRPL feature counts.`,
     "",
     "Rules: at most one item per turn. Only something observed in this turn. No praise (praise goes through /xrpl-feedback).",
+    "This note is written by the agent on the participant's behalf: submit.mjs tags it author \"agent\" so organizers weigh it apart from what the developer typed. Describe XRPL friction, not the team's own code or UI.",
     "Write summary and text in English, whatever language the developer used; translate quotes when needed.",
     "Nothing unrelated to XRPL. No invention. Do not resubmit an item already sent this session.",
     "Never invent a tx_type or result_code that did not appear in this turn; use null when unsure.",
@@ -64,7 +65,7 @@ export function buildInstruction({ submitPath, sessionId = null, signal = null, 
   if (isConfigured(config)) {
     lines.push(
       "",
-      `If node is not available, POST the same fields to ${config.endpoint}/ingest as JSON {"participant":{...},"events":[{...}]} with headers X-Ingest-Key (ingest_key from hook/devex.config.json) and, when the event is invite only, X-Invite-Code (invite_code from .xrpl-devex/identity.json). Take participant_id, team and consented_at from identity.json, set id to a fresh UUID, ts to the current ISO time, channel and kind to "reflection", evidence to "inferred".`,
+      `If node is not available, POST the same fields to ${config.endpoint}/ingest as JSON {"participant":{...},"events":[{...}]} with headers X-Ingest-Key (ingest_key from hook/devex.config.json) and, when the event is invite only, X-Invite-Code (invite_code from .xrpl-devex/identity.json). Take participant_id, team and consented_at from identity.json, set id to a fresh UUID, ts to the current ISO time, channel and kind to "reflection", evidence to "inferred", author to "agent".`,
     );
   }
   lines.push("", "If nothing qualifies, do nothing at all. Either way, write at most one short line to the user about this.");

@@ -7,11 +7,14 @@
 //   printf '%s' '<json>' | node hook/submit.mjs --channel reflection --json -
 //   node hook/submit.mjs --analysis <report.json> --markdown <report.md> [--session <id>] [--checkpoint]
 //   node hook/submit.mjs --session <id> ...                             attach a session id (Claude Code exposes ${CLAUDE_SESSION_ID} to skills)
+//   node hook/submit.mjs --force ...                                    skip the local duplicate check (fresh id, resubmit under another session)
+//   node hook/submit.mjs --id <uuid> ...                                use this event id instead of a fresh one
 //
 // Event fields accepted from the caller: surface, friction_type, feature,
 // tx_type, result_code, summary, text. Everything else (id, ts, participant,
-// team, event, channel, kind, evidence) is filled in here so nothing
-// hand-writes the buffer.
+// team, event, channel, kind, evidence, author) is filled in here so nothing
+// hand-writes the buffer. author is "agent" on the reflection channel and
+// "participant" on the feedback channel.
 //
 // Exit codes: 0 sent, buffered or skipped as duplicate; 1 validation or config
 // error (message on stderr); 3 network error that could not be buffered.
@@ -22,7 +25,8 @@ import crypto from "node:crypto";
 import { loadConfig, isConfigured } from "./lib/config.mjs";
 import { loadIdentity, isActive, participantPayload, writeHeaders, isInviteReject } from "./lib/identity.mjs";
 import { makeEvent, redactEvent } from "./lib/events.mjs";
-import { validateEvent, validateAnalysis, FEATURE_RE } from "./lib/taxonomy.mjs";
+import { runningAgents } from "./lib/install.mjs";
+import { validateEvent, validateAnalysis, canonicalSurface, SURFACES_BY_CHANNEL, SURFACE_ALIASES } from "./lib/taxonomy.mjs";
 import { appendEvents, appendAnalysesLog } from "./lib/buffer.mjs";
 import { loadAllowlist, compileAllowlist, normalizeResultCode } from "./lib/matcher.mjs";
 import { postJson } from "./lib/net.mjs";
@@ -70,10 +74,12 @@ function normalizeForDedup(text) {
 }
 
 // Normalized dedup hash with a capped state file, from the SingHacks submit.mjs.
-function isDuplicate(text, hint) {
+// The session id is part of the key so the same item can be resent under the
+// right session after a typo (T26).
+function isDuplicate(text, sessionId, hint) {
   try {
     const p = ensureDataDir(hint);
-    const hash = crypto.createHash("sha256").update(normalizeForDedup(text)).digest("hex");
+    const hash = crypto.createHash("sha256").update(`${sessionId || ""}|${normalizeForDedup(text)}`).digest("hex");
     let seen = [];
     if (fs.existsSync(p.submitState)) seen = JSON.parse(fs.readFileSync(p.submitState, "utf8"));
     if (!Array.isArray(seen)) seen = [];
@@ -90,6 +96,23 @@ function normalizeFeature(f) {
   if (f === undefined || f === null || f === "") return null;
   const s = String(f).trim().toLowerCase().replace(/[\s_]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
   return s || null;
+}
+
+// Maps aliases such as ledger or documentation; rejects with the valid list for the channel.
+function canonicalSurfaceOrFail(surface, channel) {
+  const canon = canonicalSurface(surface);
+  const allowed = SURFACES_BY_CHANNEL[channel];
+  if (canon && allowed.includes(canon)) return canon;
+  const aliases = Object.entries(SURFACE_ALIASES).map(([a, c]) => `${a} -> ${c}`).join(", ");
+  fail(`surface "${surface}" is not valid: surface must be one of ${allowed.join(", ")} (aliases accepted: ${aliases}).`);
+}
+
+// Event id override: a client uuid or any 8 to 80 character token the Worker accepts.
+function requestedId() {
+  const id = val("--id");
+  if (id === undefined) return null;
+  if (!/^[A-Za-z0-9._:-]{8,80}$/.test(id)) fail(`--id must be 8 to 80 characters of letters, digits, ".", "_", ":" or "-".`);
+  return id;
 }
 
 function canonicalTxType(tx, compiled) {
@@ -117,28 +140,32 @@ async function submitEvent() {
   if (input.result_code && !rc) fail(`result_code "${input.result_code}" does not look like an XRPL result code (tec, tem, ter, tef, tel, tes prefix), use null.`);
 
   let ev = makeEvent({
+    agent: runningAgents()[0] ?? null,
     identity,
     config,
     channel,
     kind: channel,
     session_id: sessionId,
-    surface: input.surface,
+    surface: canonicalSurfaceOrFail(input.surface, channel),
     friction_type: input.friction_type,
     feature: normalizeFeature(input.feature),
     tx_type: canonicalTxType(input.tx_type, compiled),
     result_code: rc,
     evidence: channel === "reflection" ? "inferred" : "reported",
+    author: channel === "reflection" ? "agent" : "participant",
     summary: typeof input.summary === "string" ? input.summary.trim().replace(/\s*\n\s*/g, " ") : null,
     text: typeof input.text === "string" ? input.text.trim() : null,
     payload: input.payload && typeof input.payload === "object" ? input.payload : null,
   });
   if (typeof ev.text === "string" && ev.text.length > 2000) ev.text = ev.text.slice(0, 2000);
+  const id = requestedId();
+  if (id) ev.id = id;
   ev = redactEvent(ev);
 
   const v = validateEvent(ev);
   if (!v.ok) fail("invalid event:\n  - " + v.errors.join("\n  - "));
 
-  if (isDuplicate(ev.text)) {
+  if (!has("--force") && isDuplicate(ev.text, sessionId)) {
     say("skipped: duplicate item already submitted in this project");
     process.exit(0);
   }
@@ -276,5 +303,5 @@ if (has("--text")) {
 } else if (has("--json")) {
   submitEvent().catch((err) => fail(String((err && err.message) || err)));
 } else {
-  fail("usage: --json '<fields>' [--channel reflection|feedback] [--local] [--session <id>] | --analysis <json> --markdown <md> | --retry-pending. Project: " + projectDir());
+  fail("usage: --json '<fields>' [--channel reflection|feedback] [--local] [--session <id>] [--force] [--id <uuid>] | --analysis <json> --markdown <md> | --retry-pending. Project: " + projectDir());
 }

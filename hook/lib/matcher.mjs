@@ -57,10 +57,11 @@ export function compileAllowlist(allowlist) {
   return {
     txTypes: wordGroup(a.tx_types, { caseInsensitive: true }),
     resultCodes: wordGroup(codes.known, { caseInsensitive: true }),
-    // Fallback for codes not yet in the list: prefix + underscore-separated
-    // uppercase words, at least 4 chars after the prefix, with at least one
-    // underscore or an all-uppercase body so ordinary words do not match.
-    resultPrefix: new RegExp(`(?<!${IDENT})(${prefixes.join("|")})([A-Za-z]+_[A-Za-z0-9_]+|[A-Z][A-Z0-9_]{3,})(?!${IDENT})`, "g"),
+    // Fallback for codes not yet in the list: lowercase prefix followed by an
+    // uppercase body of at least 4 chars, as every real code is written
+    // (tecNO_PERMISSION, temBAD_SIGNER). snake_case identifiers that happen to
+    // start with a prefix (test_runner, template_x, terminal_width) never match.
+    resultPrefix: new RegExp(`(?<!${IDENT})(${prefixes.join("|")})([A-Z][A-Z0-9_]{3,})(?!${IDENT})`, "g"),
     prefixes,
     fieldNames: wordGroup(a.field_names, { caseInsensitive: false }),
     strongKeywords: phraseGroup(a.strong_keywords || a.keywords),

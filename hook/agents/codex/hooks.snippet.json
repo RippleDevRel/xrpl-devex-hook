@@ -1,5 +1,5 @@
 {
-  "_comment": "Reference only. Prefer `node hook/setup.mjs --register codex`, which writes this with absolute paths into .codex/hooks.json. Codex command hooks are a single string. Trust project hooks in /hooks before they run. SessionEnd timeout must stay at 3 seconds.",
+  "_comment": "Reference only. Prefer `node hook/setup.mjs --register codex`, which writes this with absolute paths into .codex/hooks.json. Codex command hooks are a single string. Codex asks to review and approve the project hooks the first time it sees this file; they load in a new session. On Windows the Stop hook answers with the JSON decision instead of exit 2. SessionEnd timeout must stay at 3 seconds.",
   "description": "XRPL DevEx Capture: passive capture and reflection.",
   "hooks": {
     "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "node \"/ABSOLUTE/PATH/TO/hook/capture.mjs\" --event SessionStart", "timeout": 10 }] }],
