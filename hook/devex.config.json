@@ -4,7 +4,7 @@
     "xls-65",
     "xls-66"
   ],
-  "endpoint": "https://xrpl-devex.maximed.workers.dev",
+  "endpoint": "https://capture.xrpl-devex.com",
   "ingest_key": "3fd187145dca5b22b761947d49abd5d750e4f09ca2bf56f2",
   "retention_days": 90,
   "flush_max_batch": 10,
