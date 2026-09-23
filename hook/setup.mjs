@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
-import { loadConfig, isConfigured } from "./lib/config.mjs";
+import { loadConfig, isConfigured, eventIdError } from "./lib/config.mjs";
 import { consentText } from "./lib/consent.mjs";
 import { projectDir, dataPaths, HOOK_DIR, fwd } from "./lib/paths.mjs";
 import { loadIdentity, saveIdentity, createIdentity, declinedIdentity, normalizeTeam, isActive } from "./lib/identity.mjs";
@@ -63,6 +63,14 @@ if (val("--project")) process.env.XRPL_DEVEX_PROJECT_DIR = path.resolve(val("--p
 const explicitProject = Boolean(process.env.XRPL_DEVEX_PROJECT_DIR);
 const project = projectDir();
 const config = loadConfig();
+// A bad event id would make the Worker reject every participant; stop here.
+{
+  const eventProblem = eventIdError(config);
+  if (eventProblem) {
+    process.stderr.write(eventProblem + "\n");
+    process.exit(1);
+  }
+}
 
 // A closed pipe (for example an agent reading only the first lines) must not
 // turn a successful setup into a stack trace.

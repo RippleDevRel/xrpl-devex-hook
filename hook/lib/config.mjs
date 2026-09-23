@@ -83,6 +83,16 @@ export function loadConfig() {
 }
 
 // True when the organizer has filled in the endpoint and key.
+// The Worker stores the event id as a slug: lowercase letters, digits, dot,
+// underscore, hyphen, up to 64 characters. Anything else is rejected at ingest
+// with invalid_participant, so it is checked here first.
+const EVENT_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+export function eventIdError(cfg) {
+  const id = cfg && cfg.event;
+  if (typeof id !== "string" || !EVENT_ID_RE.test(id)) return `event id ${JSON.stringify(id)} in devex.config.json must be a lowercase slug (letters, digits, dot, underscore, hyphen, 64 characters at most), for example "xrpl-hackathon"`;
+  return null;
+}
+
 export function isConfigured(cfg) {
   return Boolean(cfg.endpoint) && !/REPLACE-ME/i.test(cfg.endpoint) && Boolean(cfg.ingest_key) && !/REPLACE-ME/i.test(cfg.ingest_key);
 }
