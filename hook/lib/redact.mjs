@@ -12,6 +12,14 @@
 //   pem     PEM private key blocks
 //   jwt     JSON web tokens (three base64url segments starting with eyJ)
 //   token   GitHub (ghp_, gho_, ghu_, ghs_, ghr_) and AWS access key ids
+//   email   email addresses (participants are pseudonymous; git log output,
+//           package metadata and pasted mail would otherwise name them)
+//   author  the value of git Author:, Commit:, Co-Authored-By: and
+//           Signed-off-by: lines (real names)
+//   phone   international phone numbers (+cc ... with two or more groups)
+//   pin     a 4 to 8 digit value after the word pin or PIN
+//   home    the user name segment of a home directory path (/Users/<u>/,
+//           /home/<u>/, C:\Users\<u>\) becomes ~
 //
 // Kept on purpose: ledger addresses (r... 25 to 35 base58 chars) and
 // transaction hashes shorter or longer than exactly 64 hex characters.
@@ -56,6 +64,33 @@ const RULES = [
     type: "seed",
     re: new RegExp(`(?<![${BASE58}])s[${BASE58}]{28,30}(?![${BASE58}])`, "g"),
     replace: () => "[redacted:seed]",
+  },
+  {
+    type: "author",
+    // the value runs to the closing > of an email when there is one (git log
+    // --oneline style keeps the rest of the line), else to the end of the line
+    re: /\b((?:Author|Commit|Committer|Co-Authored-By|Signed-off-by|Reviewed-by|Reported-by|Tested-by)[ \t]*:[ \t]*)(?:[^\n<]*<[^\n>]*>|[^\n]+)/gi,
+    replace: (_m, label) => `${label}[redacted:author]`,
+  },
+  {
+    type: "email",
+    re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}\b/g,
+    replace: () => "[redacted:email]",
+  },
+  {
+    type: "phone",
+    re: /(?<![\w/.-])\+\d{1,3}(?:[ .-]?\(?\d{1,4}\)?){3,6}\b/g,
+    replace: () => "[redacted:phone]",
+  },
+  {
+    type: "pin",
+    re: /\b(pin(?:\s*code)?|code\s*pin)\b(\s*(?:is|est|was|=|:|de)?\s*)(\d{4,8})\b/gi,
+    replace: (_m, label, sep) => `${label}${sep}[redacted:pin]`,
+  },
+  {
+    type: "home",
+    re: /((?:^|[\s"'(=:,]|file:\/\/)(?:\/Users\/|\/home\/|[A-Za-z]:\\{1,2}Users\\{1,2}))([^\/\\\s"'),;:]+)/g,
+    replace: (_m, prefix) => `${prefix}~`,
   },
   {
     type: "hex64",

@@ -21,6 +21,8 @@ If the event uses an invite code, the organizer hands it out on site; your agent
 
 What this is, what is captured and what is not: `docs/PARTICIPANT.md` (one page) and `docs/PRIVACY.md`. Manual install, per agent: `INSTALL.md`.
 
+Recommended alongside, not installed by the setup: the XRPL documentation MCP server, `https://mcp.xrpledger.ai` (semantic search over xrpl.org and the client libraries, no key). Claude Code: `claude mcp add --transport http xrpl-docs https://mcp.xrpledger.ai`; other agents: see `INSTALL.md`.
+
 ## Uninstall
 
 From your project root, either tell your agent `/xrpl-setup disable` or run:
@@ -47,4 +49,4 @@ Requires Node 18 or newer. No npm install, no API key, no token setup.
 
 ## For organizers
 
-This repo is generated from the reference repo https://github.com/RippleDevRel/xrpl-devex-capture.git (Worker, D1 schema, organizer export and report tooling, tests) by `scripts/sync-participant-repo.sh`. Do not edit files here: change the reference repo, run the sync, commit here. Version 2.5.0.
+This repo is generated from the reference repo https://github.com/RippleDevRel/xrpl-devex-capture.git (Worker, D1 schema, organizer export and report tooling, tests) by `scripts/sync-participant-repo.sh`. Do not edit files here: change the reference repo, run the sync, commit here. Version 2.5.1.

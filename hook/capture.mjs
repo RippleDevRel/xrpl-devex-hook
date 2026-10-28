@@ -19,6 +19,7 @@ import { loadIdentity, isActive } from "./lib/identity.mjs";
 import { loadState, saveState, sessionOf, newSession, pushRing } from "./lib/state.mjs";
 import { appendEvents, flushBuffer, flushPendingAnalyses, readJsonl, oldestTimestamp } from "./lib/buffer.mjs";
 import { makeEvent, redactEvent, truncate } from "./lib/events.mjs";
+import { redactString } from "./lib/redact.mjs";
 import { loadAllowlist, compileAllowlist, matchText, parseInstallCommand } from "./lib/matcher.mjs";
 import { dataPaths, fwd } from "./lib/paths.mjs";
 import { debug, hookLog } from "./lib/log.mjs";
@@ -90,8 +91,34 @@ function ageSeconds(iso) {
   return Number.isFinite(t) ? Math.max(0, Math.round((Date.now() - t) / 1000)) : 0;
 }
 
-function toolHaystack(toolName, input, response) {
+// A call to the XRPL documentation MCP server (https://mcp.xrpledger.ai, also
+// served at xrpl.org/mcp: search_documentation, read_documentation,
+// read_sections) is a documentation lookup, like a WebFetch of xrpl.org. Claude
+// Code names the tool mcp__<server>__<tool>; Cursor reports the server and tool
+// separately. Only the XRPL docs server is recognised, never other MCP servers.
+const DOCS_MCP_RE = /XRPLDocsTarget|xrpledger|xrpl[_-]?docs/i;
+function isDocsMcp(toolName, input) {
   const inp = input && typeof input === "object" ? input : {};
+  const server = [inp.server_name, inp.serverName, inp.server, inp.mcp_server].find((v) => typeof v === "string") || "";
+  return DOCS_MCP_RE.test(String(toolName || "")) || DOCS_MCP_RE.test(server);
+}
+function docsMcpQuery(input) {
+  const inp = input && typeof input === "object" ? input : {};
+  const args = inp.arguments && typeof inp.arguments === "object" ? inp.arguments : inp.params && typeof inp.params === "object" ? inp.params : inp;
+  for (const k of ["query", "file_path", "path", "page", "heading", "headings", "section"]) {
+    const v = args[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (Array.isArray(v) && v.length) return v.map(String).join(", ");
+  }
+  return JSON.stringify(args).slice(0, 200);
+}
+
+function toolHaystack(toolName, input, response, docsMcp = false) {
+  const inp = input && typeof input === "object" ? input : {};
+  if (docsMcp) {
+    const query = docsMcpQuery(inp);
+    return { subject: query, output: "", url: "https://mcp.xrpledger.ai", filePath: null, query };
+  }
   let resp = response;
   if (resp && typeof resp === "object") {
     const parts = [];
@@ -140,11 +167,33 @@ function isOwnCommand(command, output) {
 const DOC_LIKE = { result_codes: 3, tx_types: 6, matches: 20 };
 const GREP_LINE_RE = /^\S+\.(?:md|txt|rst|cpp|h|hpp|ts|js|mjs|py|json|toml|yaml|yml):\d+:/gm;
 const TABLE_LINE_RE = /^\s*\|.*\|\s*$/gm;
+// Numbered lines without a file prefix (grep -n on one file, sed -n, cat -n,
+// nl) and source markers (C++ includes, rippled test and transaction macros)
+// are listings of code being read, not code that ran (A11).
+const LISTING_LINE_RE = /^\s*\d+[:\-\t|]/gm;
+const SOURCE_MARK_RE = /#include\s*[<"]|BEAST_DEFINE_TESTSUITE|TRANSACTION\s*\(\s*tt|^\s*(?:namespace\s+\w+|template\s*<|class\s+\w+\s*[:{]|struct\s+\w+\s*[:{])/m;
 function looksLikeDocs(m, output = "") {
   const distinct = (kind) => new Set(m.matches.filter((x) => x.kind === kind).map((x) => x.canonical)).size;
   if (distinct("result_code") > DOC_LIKE.result_codes || distinct("tx_type") > DOC_LIKE.tx_types || m.matches.length > DOC_LIKE.matches) return true;
-  const count = (re) => ((typeof output === "string" ? output : "").match(re) || []).length;
-  return count(GREP_LINE_RE) >= 2 || count(TABLE_LINE_RE) >= 2;
+  const text = typeof output === "string" ? output : "";
+  const count = (re) => (text.match(re) || []).length;
+  return count(GREP_LINE_RE) >= 2 || count(TABLE_LINE_RE) >= 2 || count(LISTING_LINE_RE) >= 3 || SOURCE_MARK_RE.test(text);
+}
+
+// A command that only reads, lists or searches (grep, cat, sed, git log, ls)
+// shows the developer's own material or someone else's code: whatever
+// transaction type or error appears in its output is not evidence of a
+// transaction (A14). Only when every segment of the shell line is such a
+// command; a curl, a script or an interpreter anywhere in the chain keeps the
+// output as executed.
+const READ_ONLY_RE = /^(grep|egrep|fgrep|rg|ag|ack|cat|bat|less|more|sed|awk|head|tail|find|fd|ls|tree|wc|git|diff|stat|file|nl|type|Get-Content|gc|Select-String|sls|Get-ChildItem|dir|strings|xxd|hexdump|jq|yq|sort|uniq|cut|tr|column|echo|printf|which|where|pwd)$/i;
+function readsOnly(command) {
+  if (typeof command !== "string" || !command.trim()) return false;
+  const segs = command
+    .split(/&&|\|\||;|\|/)
+    .map((seg) => seg.trim().split(/\s+/).filter((t) => t && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)))
+    .filter((toks) => toks.length && toks[0] !== "cd");
+  return segs.length > 0 && segs.every((toks) => READ_ONLY_RE.test(toks[0].replace(/^.*\//, "")));
 }
 
 // A result code is only real when it comes out of code that ran: a script or
@@ -261,6 +310,16 @@ function touchesOwnFiles(command, filePath) {
 // Prompts injected by the agent runtime (task notifications, system reminders,
 // skill invocations) are not the developer speaking.
 const INJECTED_PROMPT_RE = /^\s*<[a-z][a-z0-9-]*(\s[^>]*)?>/i;
+// Some agents feed the text our own stop hooks inject back through
+// UserPromptSubmit as a plain prompt. Those turns are ours: not recorded, and
+// the reflection stays quiet on them, like a skill turn (A12). The two headers
+// are the ones built by hook/reflection.mjs and hook/checkpoint.mjs.
+const OWN_INSTRUCTION_RE = /^\s*(?:XRPL developer experience check|XRPL DevEx checkpoint)\b/i;
+// A prompt that carries a pasted mail or a contact block (headers, a
+// confidentiality notice, a signature with a phone number) is someone else's
+// personal data, whatever else it says: the row is kept for activity, its
+// text is not (B8).
+const PASTED_MAIL_RE = /CONFIDENTIALITY NOTICE|^\s*(?:From|To|Cc|Subject|Sent|Date):\s+\S|\b(?:summari[sz]e|r[eé]sume) (?:this|cet?) (?:e-?mail|mail)\b|\b(?:mobile|tel|t[eé]l[eé]phone|phone)\s*[:.]?\s*\+?\d[\d .-]{7,}|\bunsubscribe\b|\[redacted:(?:email|phone)\]/im;
 
 // Rows written without a session id from the agent get a stable identifier
 // derived from the session start, so reports can still group them.
@@ -388,13 +447,14 @@ async function main() {
       const prompt = typeof input.prompt === "string" ? input.prompt : "";
       // A turn that invokes one of our skills is ours: not recorded, and the
       // reflection stop hook stays quiet on it.
-      session.skill_turn = /^\s*\/xrpl-/i.test(prompt);
+      session.skill_turn = /^\s*\/xrpl-/i.test(prompt) || OWN_INSTRUCTION_RE.test(prompt);
       if (prompt && !session.skill_turn && !INJECTED_PROMPT_RE.test(prompt)) {
         const m = matchText(stripOwn(prompt), compiled());
         if (m.strong) {
-          const keepText = config.prompt_text === "always" || (config.prompt_text === "signal" && promptHasSignal(prompt, m));
+          const pastedMail = PASTED_MAIL_RE.test(prompt) || PASTED_MAIL_RE.test(redactString(prompt));
+          const keepText = !pastedMail && (config.prompt_text === "always" || (config.prompt_text === "signal" && promptHasSignal(prompt, m)));
           const payload = { ...matchSummary(m), turn: session.turn, chars: prompt.length };
-          if (!keepText) payload.text_omitted = config.prompt_text === "never" ? "prompt_text=never" : "no_signal";
+          if (!keepText) payload.text_omitted = pastedMail ? "pasted_mail" : config.prompt_text === "never" ? "prompt_text=never" : "no_signal";
           events.push(
             makeEvent({
               ...base,
@@ -432,7 +492,10 @@ async function main() {
       // Tool calls made by our own skills (/xrpl-feedback, /xrpl-session-analysis, ...) are not the developer's work.
       if (session.skill_turn) break;
 
-      const hay = toolHaystack(toolName, toolInput, failedEvent ? String(input.error || "") : input.tool_response);
+      // Cursor reports the MCP server beside the tool, not inside tool_input.
+      const mcpServer = [input.server_name, input.serverName, input.server, input.mcp_server].find((v) => typeof v === "string") || "";
+      const docsMcp = isDocsMcp(toolName, { ...toolInput, server_name: mcpServer });
+      const hay = toolHaystack(toolName, toolInput, failedEvent ? String(input.error || "") : input.tool_response, docsMcp);
       // A commit made through the agent closes a period of work: remembered so
       // the next Stop can ask for a checkpoint analysis of that period.
       if (toolName === "Bash" && !failedEvent) {
@@ -443,10 +506,12 @@ async function main() {
       if (touchesOwnFiles(toolInput.command, hay.filePath)) break;
       const text = stripOwn(hay.subject) + "\n" + stripOwn(hay.output);
       const rawMatch = matchText(text, compiled());
-      if (!rawMatch.strong) break;
+      // Every call to the XRPL docs server is XRPL activity, whatever the query says.
+      if (!rawMatch.strong && !docsMcp) break;
       if (toolName === "WebFetch" && !rawMatch.matches.some((x) => x.kind === "domain")) break;
 
-      const docLike = looksLikeDocs(rawMatch, hay.output);
+      const listing = toolName === "Bash" && readsOnly(toolInput.command);
+      const docLike = listing || docsMcp || looksLikeDocs(rawMatch, hay.output);
       // A result code is only real when code ran and printed it in a result
       // context: never from the command itself (a script being patched, a grep
       // for "tec"), never from a file read, a search or a download, never from
@@ -464,12 +529,17 @@ async function main() {
 
       const interrupted = Boolean(input.tool_response && typeof input.tool_response === "object" && input.tool_response.interrupted);
       const errorClass = executed && !docLike ? detectErrorClass(hay.output) : null;
-      const failed = failedEvent || interrupted || isErrorCode(m.result_code) || Boolean(errorClass);
+      // A failing grep or cat is not XRPL friction: listings never count as failures.
+      const failed = !listing && (failedEvent || interrupted || isErrorCode(m.result_code) || Boolean(errorClass));
 
       // Keyword-only matches (an ls that lists xrpl-client.ts, a package.json
       // that depends on xrpl) are activity, not evidence: counted for the
       // checkpoint, never stored. Searches keep their query as a doc signal.
-      const hasEvidence = Boolean(m.tx_type || m.result_code || failed || docLike || toolName === "WebFetch" || rawMatch.matches.some((x) => x.kind === "domain") || (toolName === "WebSearch" && (rawMatch.tx_type || rawMatch.result_code)));
+      // A read-only command is stored only when it touched documentation (a
+      // docs domain or a URL in the command); a cat or grep over local files is
+      // activity, not evidence.
+      const listingWithoutDocs = listing && !rawMatch.matches.some((x) => x.kind === "domain") && !firstUrl(toolInput.command);
+      const hasEvidence = !listingWithoutDocs && Boolean(m.tx_type || m.result_code || failed || docLike || docsMcp || toolName === "WebFetch" || rawMatch.matches.some((x) => x.kind === "domain") || (toolName === "WebSearch" && (rawMatch.tx_type || rawMatch.result_code)));
       if (!hasEvidence) {
         session.xrpl_events_since_analysis = (session.xrpl_events_since_analysis || 0) + 1;
         break;
@@ -488,7 +558,12 @@ async function main() {
       const payload = { ...matchSummary(rawMatch), turn: session.turn };
       if (docLike) payload.doc_like = true;
       if (errorClass) payload.error_class = errorClass;
-      if (toolName === "Bash") {
+      if (docsMcp) {
+        // the query or page asked of the docs server, never the page content
+        stored = truncate(hay.query, config.output_max_chars);
+        payload.mcp_tool = String(toolName).slice(0, 120);
+        payload.url = hay.url;
+      } else if (toolName === "Bash") {
         stored = docLike ? firstUrl(toolInput.command) : truncate(hay.output, config.output_max_chars);
         payload.command = normalizeCommand(toolInput.command);
         if (exitCode !== null) payload.exit_code = exitCode;
@@ -549,7 +624,7 @@ async function main() {
         const hashes = txHashes(hay.output);
         if (hashes.length) payload.tx_hashes = hashes.slice(0, 10);
       }
-      const ev = makeEvent({ ...base, kind: "tool_result", tool_name: toolName, tx_type: m.tx_type, result_code: m.result_code, feature: m.feature, failed, text: stored, payload, tx_hash: payload.tx_hashes ? payload.tx_hashes[0] : null });
+      const ev = makeEvent({ ...base, kind: "tool_result", tool_name: docsMcp ? "MCPDocs" : toolName, tx_type: m.tx_type, result_code: m.result_code, feature: m.feature, failed, text: stored, payload, tx_hash: payload.tx_hashes ? payload.tx_hashes[0] : null });
 
       if (toolName === "Bash" && !docLike && executed) {
         const track = retryTrack(session, {

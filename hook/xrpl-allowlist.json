@@ -1,10 +1,10 @@
 {
   "_sources": [
-    "tx_types: https://xrpl.org/docs/references/protocol/transactions/types and rippled develop include/xrpl/protocol/detail/transactions.macro, fetched 2026-09-10 (82 types, both sources agree). pseudo transactions from https://xrpl.org/docs/references/protocol/transactions/pseudo-transaction-types",
+    "tx_types: https://xrpl.org/docs/references/protocol/transactions/types and rippled develop include/xrpl/protocol/detail/transactions.macro, fetched 2026-09-10 (82 types, both sources agree); plus PasskeyListSet from the rippled alphanet branch transactions.macro, added 2026-10-28. pseudo transactions from https://xrpl.org/docs/references/protocol/transactions/pseudo-transaction-types",
     "result_codes.known: xrpl.org transaction-results pages (tes, tec, tem, tef, tel, ter), fetched 2026-09-10, plus codes present in rippled develop include/xrpl/protocol/TER.h but not yet on the summary pages. tecAMM_UNFUNDED (docs) and tecUNFUNDED_AMM (rippled) are both listed.",
     "field_names: xrpl.org common fields, transaction type pages, ledger entry pages and metadata page, cross-checked against rippled sfields.macro, fetched 2026-09-10. Generic names (Account, Fee, Flags, Sequence, Amount, Balance, Issuer, Owner, Expiration) are deliberately excluded because they are too common in non-XRPL code.",
     "sdk_symbols: xrpl@5.1.0 dist/npm type definitions, xrpl-py 5.1.0 package __init__ exports (plus removed 4.x names kept for legacy code), xrpl4j main tree and README, fetched 2026-09-10. Weak signals: they only count with a strong signal in the same text.",
-    "domains: https://xrpl.org/docs/tutorials/public-servers and https://xrpl.org/resources/dev-tools/xrp-faucets, fetched 2026-09-10, plus docs and explorer hosts.",
+    "domains: https://xrpl.org/docs/tutorials/public-servers and https://xrpl.org/resources/dev-tools/xrp-faucets, fetched 2026-09-10, plus docs and explorer hosts, and the XRPL documentation MCP server mcp.xrpledger.ai (added 2026-10-28).",
     "keywords: curated. strong_keywords fire on their own; weak_keywords (generic words like reserve or sequence) need a strong signal in the same text.",
     "packages: verified on registry.npmjs.org, pypi.org and Maven Central on 2026-09-10. @ripple/ is not used: no public XRPL package exists under that scope. @x402/xrpl is the official x402 XRPL implementation. xrpl-mpp-sdk is Ripple's MPP SDK (peer dep mppx). The XRPL AI Starter Kit is not a package (it is the xrpl.org MCP server plus skills in xrpl-dev-portal)."
   ],
@@ -62,6 +62,7 @@
     "OfferCreate",
     "OracleDelete",
     "OracleSet",
+    "PasskeyListSet",
     "Payment",
     "PaymentChannelClaim",
     "PaymentChannelCreate",
@@ -944,6 +945,7 @@
   ],
   "domains": [
     "xrpl.org",
+    "mcp.xrpledger.ai",
     "js.xrpl.org",
     "xrpl-py.readthedocs.io",
     "learn.xrpl.org",

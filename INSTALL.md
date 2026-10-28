@@ -209,13 +209,24 @@ In your agent, type `/xrpl-status`, then `/xrpl-feedback the devnet faucet is sl
 | `nudge_after_minutes` | 180 | or after this long (only used when checkpoints are off) |
 | `analysis_checkpoint_hours` | 2 | every N hours of XRPL activity, the Stop hook has the agent run a session analysis of the period and submit it without review (`trigger: checkpoint`); `0` disables and keeps the one-time reminder |
 | `analysis_checkpoint_min_events` | 5 | XRPL hook events needed in the period before a checkpoint fires |
-| `prompt_max_chars` | 2000 | stored prompt length |
+| `prompt_max_chars` | 600 | stored prompt length (the opening lines carry the signal; a prompt that looks like a pasted mail is never stored) |
 | `prompt_text` | `signal` | which XRPL prompts keep their text: `signal` (names a transaction type or result code, or reads like a question or problem), `always`, `never` (counted, no text) |
 | `output_max_chars` | 1500 | stored tool output length |
 
 Environment overrides: `INVITE_CODE` (event invite code at consent time, prefer the `--invite` flag), `XRPL_DEVEX_CONFIG` (path to another config file), `XRPL_DEVEX_ENDPOINT`, `XRPL_DEVEX_INGEST_KEY`, `XRPL_DEVEX_EVENT`, `XRPL_DEVEX_REFLECTION_SAMPLE` (set to `0` to pause the reflection, `1` for every turn), `XRPL_DEVEX_PROJECT_DIR` (where `.xrpl-devex/` lives, used as is without the walk-up), `XRPL_DEVEX_DEBUG=1` (writes verbose diagnostics to `.xrpl-devex/debug.log`). Independently of `XRPL_DEVEX_DEBUG`, every hook run that exits without doing anything for a reason worth knowing (unreadable stdin, identity file not found at the resolved path) appends one line to `.xrpl-devex/debug.log` (or `xrpl-devex-hook.log` in the OS temp directory when that folder cannot be created), capped at 512 KB.
 
 If the organizer has not filled in `endpoint` and `ingest_key` yet, everything still buffers locally and flushes once they do.
+
+## Optional: the XRPL documentation MCP server
+
+Not installed by this setup, recommended for the event. `https://mcp.xrpledger.ai` (also reachable as `https://xrpl.org/mcp`) is a streamable HTTP MCP server with three tools: `search_documentation` (semantic search over xrpl.org and the official client libraries), `read_documentation` and `read_sections`. No key, no account.
+
+- Claude Code: `claude mcp add --transport http xrpl-docs https://mcp.xrpledger.ai` (add `--scope project` to share it through `.mcp.json`).
+- Cursor: in `.cursor/mcp.json`, `{"mcpServers": {"xrpl-docs": {"url": "https://mcp.xrpledger.ai"}}}`.
+- Codex: in `~/.codex/config.toml`, `[mcp_servers.xrpl-docs]` with `url = "https://mcp.xrpledger.ai"`.
+- Other agents: their MCP settings, with that URL and the streamable HTTP transport.
+
+The capture hook records a call to this server as a documentation lookup (tool name `MCPDocs`, the query or page asked, never the page content), the same way it records a WebFetch of xrpl.org. Queries go to that server, which is operated for the XRPL community and is not part of this capture tool; see its own terms.
 
 ## Uninstall
 

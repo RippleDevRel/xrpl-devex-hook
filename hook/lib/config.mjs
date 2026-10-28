@@ -33,7 +33,7 @@ export const DEFAULTS = {
   // a git commit made through the agent closes a period; at most one commit
   // checkpoint per this many minutes, the hourly checkpoint stays as fallback
   analysis_commit_cooldown_minutes: 30,
-  prompt_max_chars: 2000,
+  prompt_max_chars: 600,
   output_max_chars: 1500,
   // Which prompts keep their text: "signal" (a transaction type, a result code
   // or wording that describes a question or a problem), "always", or "never"

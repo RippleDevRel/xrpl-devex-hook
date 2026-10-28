@@ -14,10 +14,10 @@ Team plus pseudonym can still be re-identifying in a small cohort: an organizer 
 
 Only when the text has an XRPL allowlist hit (`hook/xrpl-allowlist.json`: transaction types, result codes, xrpl.org and network domains, XRPL field names, XRPL keywords, XRPL packages):
 
-- prompts to the agent that mention XRPL: counted always, stored verbatim (truncated to `prompt_max_chars`, default 2000) only when they name a transaction type or a result code, or read like a question or a problem report (`prompt_text: "signal"`, the default). A mission statement or a task list that merely mentions xrpl.js is counted, not stored. Organizers can set `prompt_text` to `never` or `always`.
+- prompts to the agent that mention XRPL: counted always, stored verbatim (truncated to `prompt_max_chars`, default 600) only when they name a transaction type or a result code, or read like a question or a problem report (`prompt_text: "signal"`, the default). A mission statement or a task list that merely mentions xrpl.js is counted, not stored. Organizers can set `prompt_text` to `never` or `always`. A prompt that looks like a pasted mail or a contact block (mail headers, a confidentiality notice, a signature with a phone number) is counted but its text is never stored, whatever else it says.
 - tool output excerpts for Bash, truncated to `output_max_chars` (default 1500), with the command normalized to basenames. When the output is documentation being read (a spec, a reference page, type definitions, recognizable by the dozens of transaction types or result codes it lists), no excerpt is stored, only the URL fetched if any, and it counts as neither an error nor a retry
 - for Write, Edit and Read of XRPL-related files: the file name only, never the content
-- XRPL docs URLs fetched, XRPL search queries
+- XRPL docs URLs fetched, XRPL search queries, and the query or page asked of the XRPL documentation MCP server (`MCPDocs` rows; never the page content)
 - XRPL packages installed (`npm install xrpl` records `["xrpl"]`, nothing else)
 - retry metadata: attempts, elapsed seconds, last result code before success, per transaction type
 - session markers: start, end, compaction, with turn counts
@@ -43,7 +43,7 @@ Some events are invite only. The code the organizer hands out is stored in the s
 
 ## Redaction
 
-`hook/lib/redact.mjs` runs on every event before it is buffered (`capture.mjs`) and again before anything is sent (`submit.mjs`). It replaces with `[redacted:<type>]`: XRPL family seeds (`s` plus 28 to 30 base58 characters, and `sEd` prefixed), 64 hex character strings (raw private keys; transaction hashes have the same shape and are redacted too in hook captures), `Bearer <token>` values, and the value of anything matching `KEY=`, `TOKEN=`, `SECRET=`, `PASSWORD=`, `SEED=`, `PRIVATE=`, `MNEMONIC=`, `PASSPHRASE=`, in env, JSON, YAML and TOML forms. The session analysis skill does a fuller manual redaction pass and lists what it removed in `redacted`.
+`hook/lib/redact.mjs` runs on every event before it is buffered (`capture.mjs`) and again before anything is sent (`submit.mjs`). It replaces with `[redacted:<type>]`: XRPL family seeds (`s` plus 28 to 30 base58 characters, and `sEd` prefixed), 64 hex character strings (raw private keys; transaction hashes have the same shape and are redacted too in hook captures), `Bearer <token>` values, the value of anything matching `KEY=`, `TOKEN=`, `SECRET=`, `PASSWORD=`, `SEED=`, `PRIVATE=`, `MNEMONIC=`, `PASSPHRASE=`, in env, JSON, YAML and TOML forms, PEM private key blocks, JSON web tokens, GitHub and AWS tokens, and since 2.5.1 personal data that tool output drags in: email addresses, the value of git `Author:`, `Commit:`, `Co-Authored-By:` and `Signed-off-by:` lines, international phone numbers, a PIN written after the word pin, and the user name segment of home directory paths (`/Users/<name>/` becomes `/Users/~/`). Ledger addresses, hashes shorter than 64 hex characters, amounts, dates and ports are untouched. The session analysis skill does a fuller manual redaction pass and lists what it removed in `redacted`.
 
 ### Addresses and hashes: what is kept
 
