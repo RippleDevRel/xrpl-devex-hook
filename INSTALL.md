@@ -223,7 +223,7 @@ If the organizer has not filled in `endpoint` and `ingest_key` yet, everything s
 node REPO/hook/setup.mjs --unregister
 ```
 
-Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` directory) for local data. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`, `.grok/skills`.
+This removes the project hooks the setup wrote, for every agent. Then delete `<project>/.xrpl-devex/identity.json` (or the whole `.xrpl-devex/` directory) for local data, the buffer and the reports. Skills: delete the `xrpl-*` entries in `.claude/skills`, `.cursor/skills`, `.codex/skills`, `.grok/skills`. If you installed the optional pre-commit guard, remove the `precommit-secrets` line from `.git/hooks/pre-commit`. Finally delete the clone of this repo. To have the data already sent deleted, give the organizer your pseudonym (`/xrpl-status` shows it) before deleting `.xrpl-devex`.
 
 ## Safety notes
 

@@ -23,3 +23,7 @@ npm-debug.log*
 
 # OS
 .DS_Store
+
+# Organizer credentials for organizer/export.mjs (ENDPOINT, ADMIN_KEY, EVENT); never committed
+.env
+.env.*

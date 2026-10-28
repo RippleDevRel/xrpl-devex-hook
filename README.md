@@ -8,7 +8,7 @@ Download the XRPL DevEx Capture install instructions from https://github.com/Rip
 
 Your agent clones this repo, shows you a one-paragraph consent text, asks for your team name, and registers the hooks for this project only. About a minute. Nothing is captured until you say yes, and never your name, never file contents.
 
-Event invite code: `Swell_Hackathon26` (the instructions carry it, your agent passes it to the setup for you; keep it if the agent asks).
+If the event uses an invite code, the organizer hands it out on site; your agent asks you for it during the setup.
 
 ## Then, during the event
 
@@ -20,6 +20,17 @@ Event invite code: `Swell_Hackathon26` (the instructions carry it, your agent pa
 | `/xrpl-setup` | consent, team, pseudonym, hook registration. `/xrpl-setup disable` removes the hooks. |
 
 What this is, what is captured and what is not: `docs/PARTICIPANT.md` (one page) and `docs/PRIVACY.md`. Manual install, per agent: `INSTALL.md`.
+
+## Uninstall
+
+From your project root, either tell your agent `/xrpl-setup disable` or run:
+
+```bash
+node <path to this clone>/hook/setup.mjs --unregister   # removes the project hooks this setup wrote, for every agent
+rm -rf .xrpl-devex                                       # local buffer, identity (pseudonym) and reports; stops all capture
+```
+
+Then delete the `xrpl-*` skill folders in `.claude/skills`, `.cursor/skills`, `.codex/skills` or `.grok/skills`, remove the `precommit-secrets` line from `.git/hooks/pre-commit` if you installed the optional guard, and delete the clone. Nothing is written outside your project and the clone, so that is the whole footprint. To have the data already sent deleted, give the organizer your pseudonym (shown by `/xrpl-status` before you delete `.xrpl-devex`); see `docs/PRIVACY.md`.
 
 ## What is in here
 

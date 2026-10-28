@@ -67,7 +67,7 @@ Remotely: the organizer's Cloudflare Worker and D1 database, described in `docs/
 
 ## Opting out
 
-At any time: `/xrpl-setup disable` removes the Claude Code hooks; deleting `.xrpl-devex/identity.json` stops all capture and forgets the pseudonym; deleting `.xrpl-devex/` removes all local data. To have already-sent data removed, give the organizer your pseudonym (shown by `/xrpl-status`); they can delete by `participant_id` in the D1 console.
+At any time: `/xrpl-setup disable` (or `node hook/setup.mjs --unregister`) removes the project hooks of every agent; deleting `.xrpl-devex/identity.json` stops all capture and forgets the pseudonym; deleting `.xrpl-devex/` removes all local data. To have already-sent data removed, give the organizer your pseudonym (shown by `/xrpl-status`); they can delete by `participant_id` in the D1 console.
 
 ## Abuse
 
