@@ -8,7 +8,7 @@ Download the XRPL DevEx Capture install instructions from https://github.com/Rip
 
 Your agent clones this repo, shows you a one-paragraph consent text, asks for your team name, and registers the hooks for this project only. About a minute. Nothing is captured until you say yes, and never your name, never file contents.
 
-If the event uses an invite code, the organizer hands it out on site; your agent asks you for it during the setup.
+Event invite code: `W3NodeHackathon26XRPL` (the instructions carry it, your agent passes it to the setup for you; keep it if the agent asks).
 
 ## Then, during the event
 

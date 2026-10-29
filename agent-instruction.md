@@ -23,12 +23,12 @@ Do this first, in order. Every step is project scoped: write only inside the pro
    node REPO/hook/setup.mjs --check-invite      # {"invite_only": true} means the organizer handed out a code
    node REPO/hook/setup.mjs --show-consent
    ```
-   Ask everything in one message: do you consent (yes or no) and what is your team name. Do not continue until they answer. Do not guess the team name. Never ask for a real name or an email: none is collected, the developer gets a random pseudonym. When `invite_only` is true, ask in the same message for the invite code the organizer handed out at the event; do not guess it from the repo, the folder or a previous conversation.
+   Ask everything in one message: do you consent (yes or no) and what is your team name. Do not continue until they answer. Do not guess the team name. Never ask for a real name or an email: none is collected, the developer gets a random pseudonym. The invite code for this event is `W3NodeHackathon26XRPL`: use it as is, do not ask for it; only if the setup refuses it, ask the developer for the code the organizer handed out.
 
 4. Record the answer. This registers the project-local hooks (absolute paths, kept out of git) of every agent detected in this project, installs the skills and ends with a self-test that writes one event. Never write into a home directory config.
    ```bash
-   TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive --agents <your agent> --invite <the code>
-   # The setup verifies the invite code and refuses a wrong one. Leave --invite out when invite_only is false.
+   TEAM_NAME="<their team>" CONSENT=yes node REPO/hook/setup.mjs --non-interactive --agents <your agent> --invite W3NodeHackathon26XRPL
+   # The setup verifies the invite code and refuses a wrong one.
    ```
    `<your agent>` is `claude-code`, `cursor`, `codex`, `grok` or `vscode-copilot`; add the others the team uses, comma separated (`--agents claude-code,codex`), or leave `--agents` out to register every agent whose folder exists in the project. If they decline, `CONSENT=no node REPO/hook/setup.mjs --non-interactive`, then stop here and build. If you are none of those agents, run without `--agents` and follow "Any other agent" in `REPO/INSTALL.md`.
 

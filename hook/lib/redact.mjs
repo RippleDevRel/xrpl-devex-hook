@@ -89,8 +89,21 @@ const RULES = [
   },
   {
     type: "home",
-    re: /((?:^|[\s"'(=:,]|file:\/\/)(?:\/Users\/|\/home\/|[A-Za-z]:\\{1,2}Users\\{1,2}))([^\/\\\s"'),;:]+)/g,
+    re: /((?:^|[\s"'`(=:,\[]|file:\/\/)(?:\/Users\/|\/home\/|[A-Za-z]:\\{1,2}Users\\{1,2}))([^\/\\\s"'`),;:\]]+)/g,
     replace: (_m, prefix) => `${prefix}~`,
+  },
+  {
+    // the same home directory flattened into a folder name (-Users-<u>-Documents),
+    // as some agents name their scratch directories
+    type: "home",
+    re: /(-Users-)([A-Za-z0-9._]+)(?=-)/g,
+    replace: (_m, prefix) => `${prefix}~`,
+  },
+  {
+    // the owner column of ls -l output: "drwxr-xr-x  9 <user>  staff"
+    type: "home",
+    re: /(^[-dl][-rwxsStT@+]{9,10}\s+\d+\s+)([A-Za-z0-9._-]+)(\s+[A-Za-z0-9._-]+\s+\d)/gm,
+    replace: (_m, a, _u, c) => `${a}~${c}`,
   },
   {
     type: "hex64",
