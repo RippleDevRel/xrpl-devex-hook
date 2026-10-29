@@ -426,6 +426,7 @@ async function main() {
       if (source === "compact") session.compacted = true;
       session.turn_errors = 0;
       session.turn_result_codes = [];
+      session.turn_xrpl_events = 0;
       events.push(makeEvent({ ...base, kind: "session_start", payload: { source, model: typeof input.model === "string" ? input.model : undefined } }));
       if (source === "compact") {
         stdoutJson = {
@@ -444,6 +445,7 @@ async function main() {
       session.turn += 1;
       session.turn_errors = 0;
       session.turn_result_codes = [];
+      session.turn_xrpl_events = 0;
       const prompt = typeof input.prompt === "string" ? input.prompt : "";
       // A turn that invokes one of our skills is ours: not recorded, and the
       // reflection stop hook stays quiet on it.
@@ -542,6 +544,7 @@ async function main() {
       const hasEvidence = !listingWithoutDocs && Boolean(m.tx_type || m.result_code || failed || docLike || docsMcp || toolName === "WebFetch" || rawMatch.matches.some((x) => x.kind === "domain") || (toolName === "WebSearch" && (rawMatch.tx_type || rawMatch.result_code)));
       if (!hasEvidence) {
         session.xrpl_events_since_analysis = (session.xrpl_events_since_analysis || 0) + 1;
+        session.turn_xrpl_events = (session.turn_xrpl_events || 0) + 1;
         break;
       }
       let exitCode = null;
@@ -757,7 +760,10 @@ async function main() {
   if (events.length && session && !input.session_id) for (const e of events) e.session_id = derivedSessionId(session);
   if (events.length) appendEvents(events.map(redactEvent), hint);
   if (session && events.length) {
-    session.xrpl_events_since_analysis = (session.xrpl_events_since_analysis || 0) + events.filter((e) => ["prompt", "tool_result", "package_install", "retry_resolved"].includes(e.kind)).length;
+    const xrplEvents = events.filter((e) => ["prompt", "tool_result", "package_install", "retry_resolved"].includes(e.kind)).length;
+    session.xrpl_events_since_analysis = (session.xrpl_events_since_analysis || 0) + xrplEvents;
+    // per-turn XRPL activity, the quiet-turn signal of the reflection (reset on every prompt)
+    session.turn_xrpl_events = (session.turn_xrpl_events || 0) + events.filter((e) => ["tool_result", "package_install", "retry_resolved"].includes(e.kind)).length;
   }
   saveState(state, hint);
   if (stdoutJson) process.stdout.write(JSON.stringify(stdoutJson) + "\n");

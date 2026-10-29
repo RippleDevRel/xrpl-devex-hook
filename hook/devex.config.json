@@ -1,6 +1,19 @@
 {
   "event": "w3node-capetown-2026",
   "focus_features": [
+    "x402",
+    "mpp",
+    "payment-channels",
+    "batch",
+    "delegate",
+    "credentials",
+    "permissioned-domains",
+    "sponsorship",
+    "escrow",
+    "mpt",
+    "payments",
+    "rlusd",
+    "funding",
     "xls-65",
     "xls-66"
   ],
@@ -13,6 +26,7 @@
   "reflection_sample": 0.1,
   "reflection_cooldown_turns": 3,
   "reflection_max_per_session": 8,
+  "reflection_activity_min_events": 2,
   "nudge_after_turns": 40,
   "nudge_after_minutes": 180,
   "prompt_max_chars": 600,

@@ -23,6 +23,7 @@ export function newSession(sessionId, now = new Date()) {
     last_seen_at: now.toISOString(),
     turn: 0,
     turn_errors: 0,
+    turn_xrpl_events: 0,
     turn_result_codes: [],
     nudged: false,
     analysis_submitted: false,

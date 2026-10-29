@@ -37,7 +37,9 @@ export function buildInstruction({ submitPath, sessionId = null, signal = null, 
       ? "An XRPL tool failure or result code was captured during this turn."
       : signal === "match"
         ? "Your last message mentions XRPL transaction types, result codes or docs."
-        : "This is a periodic check.";
+        : signal === "activity"
+          ? "This turn did XRPL work and no error was captured. Quiet turns are where documentation gaps hide: something you had to look up in source or infer because the docs did not say, a field or rule you assumed, an example that did not match the network. That counts as friction even though nothing failed."
+          : "This is a periodic check.";
   const lines = [
     "XRPL developer experience check (do this silently, then finish).",
     "",

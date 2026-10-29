@@ -49,6 +49,11 @@ export function decideReflection(input, { useSignal = true } = {}) {
     }
   }
   if (session.last_reflection_turn === session.turn) return { fire: false, reason: "already prompted this turn" };
+  // A quiet turn that still did XRPL work (tool results captured, no error) is
+  // where documentation gaps and wrong assumptions hide: it fires like a match,
+  // but paced by the cooldown. reflection_activity_min_events 0 disables it.
+  const minActivity = Number(config.reflection_activity_min_events);
+  if (!signal && useSignal && minActivity > 0 && (session.turn_xrpl_events || 0) >= minActivity && !inCooldown) signal = "activity";
   if (!signal && !inCooldown && passesSampling(config)) signal = "sample";
   if (!signal) return { fire: false, reason: inCooldown ? "cooldown" : "no signal" };
 

@@ -205,6 +205,7 @@ In your agent, type `/xrpl-status`, then `/xrpl-feedback the devnet faucet is sl
 | `reflection_sample` | 0.1 | random fallback rate for turns with no XRPL signal (0 to 1) |
 | `reflection_cooldown_turns` | 3 | minimum turns between two random-fallback reflection prompts; an XRPL error or a strong XRPL mention fires regardless (at most once per turn) |
 | `reflection_max_per_session` | 8 | cap on reflection items per session |
+| `reflection_activity_min_events` | 2 | a turn with at least this many XRPL tool results and no error also triggers the reflection (paced by the cooldown); quiet turns are where documentation gaps hide. 0 disables it |
 | `nudge_after_turns` | 40 | one-time reminder to run `/xrpl-session-analysis` |
 | `nudge_after_minutes` | 180 | or after this long (only used when checkpoints are off) |
 | `analysis_checkpoint_hours` | 2 | every N hours of XRPL activity, the Stop hook has the agent run a session analysis of the period and submit it without review (`trigger: checkpoint`); `0` disables and keeps the one-time reminder |

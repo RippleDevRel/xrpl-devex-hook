@@ -22,7 +22,7 @@ The agent shows you a consent paragraph and asks for your team name. Say yes or 
 | "is this thing on?" | `/xrpl-status` | instant, no network |
 | you change your mind | `/xrpl-setup disable`, or delete `.xrpl-devex/identity.json`; full uninstall in the README | |
 
-You will occasionally see your agent do an "XRPL developer experience check" at the end of a turn where an XRPL error happened. That is the reflection hook asking the model whether the turn revealed friction. It costs one short model turn and writes at most one line to you. Set `XRPL_DEVEX_REFLECTION_SAMPLE=0` in your shell to limit it to error turns only.
+You will occasionally see your agent do an "XRPL developer experience check" at the end of a turn where an XRPL error happened, or where it did XRPL work without an error (that is where documentation gaps hide). That is the reflection hook asking the model whether the turn revealed friction. It costs one short model turn and writes at most one line to you. Set `XRPL_DEVEX_REFLECTION_SAMPLE=0` in your shell to limit it to error turns only.
 
 ## What works where
 
