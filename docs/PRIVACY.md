@@ -1,5 +1,9 @@
 # Privacy
 
+## Scope
+
+This tool is meant for one use only: an XRPL hackathon run by organizers who hand out an invite code for the event. The setup refuses to register without a valid code, every row sent carries the event id, and the data is read by the organizers of that event for developer experience reporting. Do not install it outside such an event. For any request to delete data, to know what was sent under your pseudonym, or any other question, contact the organizers of the hackathon you took part in; they hold the data and are the only ones who can act on it.
+
 ## Consent
 
 Consent is explicit, once, at first run, before anything is buffered. The consent text lives in `hook/lib/consent.mjs` and is what `setup.mjs` and `/xrpl-setup` show. Declining writes `{ "declined": true }` to `.xrpl-devex/identity.json`; every hook reads that file first and exits immediately. The decision holds until the participant deletes the file.
@@ -67,7 +71,7 @@ Remotely: the organizer's Cloudflare Worker and D1 database, described in `docs/
 
 ## Opting out
 
-At any time: `/xrpl-setup disable` (or `node hook/setup.mjs --unregister`) removes the project hooks of every agent; deleting `.xrpl-devex/identity.json` stops all capture and forgets the pseudonym; deleting `.xrpl-devex/` removes all local data. To have already-sent data removed, give the organizer your pseudonym (shown by `/xrpl-status`); they can delete by `participant_id` in the D1 console.
+At any time: `/xrpl-setup disable` (or `node hook/setup.mjs --unregister`) removes the project hooks of every agent; deleting `.xrpl-devex/identity.json` stops all capture and forgets the pseudonym; deleting `.xrpl-devex/` removes all local data. To have already-sent data removed, or to ask what was sent, contact the organizers of the hackathon with your pseudonym (shown by `/xrpl-status`); they delete by `participant_id` in the database.
 
 ## Abuse
 
