@@ -10,9 +10,15 @@ import { loadAllowlist, compileAllowlist, matchText } from "./matcher.mjs";
 import { passesSampling } from "../sampling.mjs";
 import { normalizeHookInput } from "./normalize.mjs";
 
+// PowerShell 5.1 prepends a UTF-8 byte order mark when it pipes text; JSON.parse
+// refuses it. Strip it (and any leading NUL from a UTF-16 pipe) before parsing.
+export function stripBom(text) {
+  return typeof text === "string" ? text.replace(/^\uFEFF/, "").replace(/^\u0000+/, "") : text;
+}
+
 export function readStdinJson() {
   try {
-    const raw = fs.readFileSync(0, "utf8");
+    const raw = stripBom(fs.readFileSync(0, "utf8"));
     return raw.trim() ? normalizeHookInput(JSON.parse(raw)) : {};
   } catch {
     return null;

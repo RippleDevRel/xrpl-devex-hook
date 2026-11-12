@@ -20,6 +20,7 @@ import { loadState, saveState, sessionOf, newSession, pushRing } from "./lib/sta
 import { appendEvents, flushBuffer, flushPendingAnalyses, readJsonl, oldestTimestamp } from "./lib/buffer.mjs";
 import { makeEvent, redactEvent, truncate } from "./lib/events.mjs";
 import { redactString } from "./lib/redact.mjs";
+import { stripBom } from "./lib/stop-common.mjs";
 import { loadAllowlist, compileAllowlist, matchText, parseInstallCommand } from "./lib/matcher.mjs";
 import { dataPaths, fwd } from "./lib/paths.mjs";
 import { debug, hookLog } from "./lib/log.mjs";
@@ -53,7 +54,7 @@ function exit0(reason) {
 
 function readStdin() {
   try {
-    const raw = fs.readFileSync(0, "utf8");
+    const raw = stripBom(fs.readFileSync(0, "utf8"));
     const input = raw.trim() ? normalizeHookInput(JSON.parse(raw)) : {};
     if (input && typeof input.cwd === "string") stdinHint = input.cwd;
     return input;

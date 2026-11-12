@@ -33,6 +33,7 @@ import { postJson } from "./lib/net.mjs";
 import { dataPaths, ensureDataDir, projectDir } from "./lib/paths.mjs";
 import { updateState } from "./lib/state.mjs";
 import { redactDeep } from "./lib/redact.mjs";
+import { stripBom } from "./lib/stop-common.mjs";
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -61,6 +62,7 @@ function readJsonArg(raw) {
       text = "";
     }
   }
+  text = stripBom(text);
   if (!text || !text.trim()) fail("no JSON provided. Pass --json '<object>' or pipe it with --json -");
   try {
     return JSON.parse(text);
